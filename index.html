@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solo Leveling Combat OS</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;700&display=swap');
+
+        :root {
+            --neon-blue: #00f3ff;
+            --neon-pink: #ff00ff;
+            --gold: #ffd700;
+            --dark-glass: rgba(10, 15, 30, 0.85);
+            --red-alert: #ff2a2a;
+            --green-safe: #00ff00;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #050505;
+            background-image: 
+                radial-gradient(circle at 50% 50%, #1a1a2e 0%, #000000 100%),
+                linear-gradient(rgba(0, 243, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 243, 255, 0.05) 1px, transparent 1px);
+            background-size: 100% 100%, 20px 20px, 20px 20px;
+            font-family: 'Share Tech Mono', monospace;
+            color: white;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+        }
+
+        /* Scanline effect */
+        body::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 2;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        /* HUD Elements */
+        .hud-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+        }
+
+        .diamond-counter {
+            background: var(--dark-glass);
+            border: 1px solid var(--neon-pink);
+            padding: 10px 20px;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(255, 0, 255, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transform: skew(-10deg);
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        
+        .diamond-counter:hover {
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.6);
+            background: rgba(255, 0, 255, 0.1);
+        }
+
+        .diamond-counter span {
+            transform: skew(10deg);
+            font-size: 1.2rem;
+            color: var(--neon-pink);
+            text-shadow: 0 0 5px var(--neon-pink);
+        }
+
+        .store-btn {
+            background: var(--dark-glass);
+            border: 1px solid var(--gold);
+            padding: 10px 20px;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+            transform: skew(-10deg);
+            cursor: pointer;
+            color: var(--gold);
+            font-family: 'Share Tech Mono', monospace;
+            text-transform: uppercase;
+            transition: 0.3s;
+        }
+
+        .store-btn:hover {
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+            background: rgba(255, 215, 0, 0.1);
+        }
+
+        .store-btn span {
+            transform: skew(10deg);
+            display: block;
+        }
+
+        /* Base Window Style */
+        .system-window {
+            background: var(--dark-glass);
+            border: 2px solid var(--neon-blue);
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.2), inset 0 0 20px rgba(0, 243, 255, 0.1);
+            border-radius: 8px;
+            width: 90%;
+            max-width: 450px;
+            max-height: 85vh;
+            position: relative;
+            z-index: 10;
+            backdrop-filter: blur(10px);
+            animation: float 6s ease-in-out infinite;
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            transform: scale(0.95);
+            pointer-events: none;
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        .system-window.active {
+            opacity: 1;
+            transform: scale(1);
+            pointer-events: all;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        /* Header */
+        .window-header {
+            border-bottom: 1px solid rgba(0, 243, 255, 0.3);
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(90deg, rgba(0,243,255,0.1) 0%, transparent 100%);
+        }
+
+        .header-title {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1.5rem;
+            color: var(--neon-blue);
+            text-shadow: 0 0 5px var(--neon-blue);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        
+        .header-title.warning {
+            color: #ff9900;
+            text-shadow: 0 0 5px #ff9900;
+        }
+
+        .close-btn {
+            color: var(--red-alert);
+            cursor: pointer;
+            font-size: 1.2rem;
+            text-shadow: 0 0 5px var(--red-alert);
+            transition: 0.2s;
+        }
+        .close-btn:hover { text-shadow: 0 0 15px var(--red-alert); transform: scale(1.1); }
+
+        /* Window Content */
+        .window-content {
+            padding: 20px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+        
+        .window-content::-webkit-scrollbar {
+            width: 5px;
+        }
+        .window-content::-webkit-scrollbar-thumb {
+            background: var(--neon-blue);
+            border-radius: 5px;
+        }
+
+        /* Status Window Specifics */
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-item {
+            background: rgba(0, 243, 255, 0.05);
+            padding: 10px;
+            border-left: 2px solid var(--neon-blue);
+            font-size: 0.9rem;
+        }
+        
+        .stat-label { color: #888; margin-bottom: 5px; font-size: 0.8rem; }
+        .stat-value { color: white; font-size: 1.1rem; }
+        
+        .vitals { margin-top: 20px; }
+        .vital-bar-container { margin-bottom: 15px; }
+        .vital-label { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9rem; }
+        .vital-bar { height: 10px; background: #222; border-radius: 2px; overflow: hidden; border: 1px solid #333; }
+        .vital-fill { height: 100%; transition: width 0.3s; }
+        .fill-hp { width: 100%; background: linear-gradient(90deg, #0055ff, #00aaff); box-shadow: 0 0 10px #0055ff; }
+        .fill-mp { width: 100%; background: linear-gradient(90deg, #00aaff, #00ffff); box-shadow: 0 0 10px #00aaff; }
+        .fill-fatigue { width: 0%; background: var(--red-alert); }
+
+        /* Quest Window Specifics */
+        .timer-container {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid var(--red-alert);
+            background: rgba(255, 42, 42, 0.1);
+            color: var(--red-alert);
+            text-shadow: 0 0 5px var(--red-alert);
+            font-size: 1.2rem;
+            border-radius: 4px;
+        }
+        .timer-container.frozen {
+            border-color: var(--green-safe);
+            background: rgba(0, 255, 0, 0.1);
+            color: var(--green-safe);
+            text-shadow: 0 0 5px var(--green-safe);
+        }
+
+        .level-indicator {
+            text-align: center;
+            color: var(--gold);
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            text-shadow: 0 0 5px var(--gold);
+        }
+
+        .progress-container {
+            margin-bottom: 20px;
+        }
+        .progress-bar-bg {
+            height: 15px;
+            background: #111;
+            border: 1px solid var(--neon-blue);
+            border-radius: 3px;
+            overflow: hidden;
+            position: relative;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--neon-blue);
+            box-shadow: 0 0 10px var(--neon-blue);
+            transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+        .progress-bar-fill::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(45deg, rgba(255,255,255,0.2) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.2) 75%, transparent 75%, transparent);
+            background-size: 20px 20px;
+            animation: moveStripes 1s linear infinite;
+        }
+        @keyframes moveStripes { 0% { background-position: 0 0; } 100% { background-position: 20px 0; } }
+
+        .task-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .task-item {
+            display: flex;
+            align-items: center;
+            background: rgba(0, 243, 255, 0.03);
+            border: 1px solid rgba(0, 243, 255, 0.1);
+            padding: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .task-item:hover { background: rgba(0, 243, 255, 0.1); border-color: rgba(0, 243, 255, 0.3); }
+        .task-item.completed {
+            background: rgba(10, 10, 10, 0.5);
+            border-color: #333;
+        }
+        .task-item.completed .task-text {
+            color: #555;
+            text-decoration: line-through;
+            text-shadow: none;
+        }
+        
+        .checkbox {
+            width: 20px;
+            height: 20px;
+            border: 1px solid var(--neon-blue);
+            margin-right: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: inset 0 0 5px rgba(0, 243, 255, 0.2);
+            transition: 0.3s;
+        }
+        .task-item.completed .checkbox {
+            background: var(--neon-blue);
+            box-shadow: 0 0 10px var(--neon-blue);
+        }
+        .checkbox::after {
+            content: '✓';
+            color: #000;
+            font-size: 14px;
+            display: none;
+        }
+        .task-item.completed .checkbox::after { display: block; }
+        
+        .task-text {
+            color: #ddd;
+            font-size: 0.95rem;
+            flex-grow: 1;
+            transition: 0.3s;
+        }
+        .task-meta {
+            color: var(--neon-blue);
+            font-size: 0.8rem;
+        }
+        .task-item.completed .task-meta { color: #555; }
+
+        .ai-message {
+            margin-top: 15px;
+            min-height: 40px;
+            color: var(--gold);
+            font-style: italic;
+            text-align: center;
+            font-size: 0.9rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .ai-message.show { opacity: 1; }
+
+        /* Action Buttons */
+        .action-btn {
+            width: 100%;
+            padding: 15px;
+            margin-top: 20px;
+            background: transparent;
+            border: 1px solid #555;
+            color: #555;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+            cursor: not-allowed;
+            transition: 0.3s;
+            text-transform: uppercase;
+        }
+        .action-btn.unlocked {
+            border-color: var(--gold);
+            color: var(--gold);
+            cursor: pointer;
+            text-shadow: 0 0 10px var(--gold);
+            box-shadow: inset 0 0 20px rgba(255, 215, 0, 0.1);
+            animation: pulse-gold 2s infinite;
+        }
+        .action-btn.unlocked:hover {
+            background: rgba(255, 215, 0, 0.1);
+            box-shadow: inset 0 0 30px rgba(255, 215, 0, 0.2), 0 0 15px rgba(255, 215, 0, 0.3);
+        }
+
+        @keyframes pulse-gold {
+            0% { box-shadow: inset 0 0 10px rgba(255,215,0,0.1); }
+            50% { box-shadow: inset 0 0 20px rgba(255,215,0,0.3); border-color: #fff; color: #fff; }
+            100% { box-shadow: inset 0 0 10px rgba(255,215,0,0.1); }
+        }
+
+        /* Reward Window & Buffs */
+        .reward-box {
+            text-align: center;
+            padding: 20px 0;
+        }
+        .reward-title {
+            color: var(--neon-pink);
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px var(--neon-pink);
+            font-family: 'Rajdhani', sans-serif;
+        }
+        .reward-amount {
+            font-size: 3rem;
+            color: white;
+            text-shadow: 0 0 20px var(--neon-pink);
+            margin-bottom: 30px;
+        }
+        
+        .buff-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .buff-item {
+            border: 1px solid var(--neon-blue);
+            background: rgba(0, 243, 255, 0.05);
+            padding: 15px 5px;
+            cursor: pointer;
+            transition: 0.3s;
+            color: #ddd;
+            font-size: 0.9rem;
+        }
+        .buff-item.secret {
+            border-color: var(--gold);
+            color: var(--gold);
+            text-shadow: 0 0 5px var(--gold);
+        }
+        .buff-item:hover { background: rgba(0, 243, 255, 0.1); }
+        .buff-item.secret:hover { background: rgba(255, 215, 0, 0.1); }
+        
+        .buff-item.selected {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: #fff;
+            color: #fff;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+        }
+
+        /* Store Window */
+        .store-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            max-height: 50vh;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        .store-grid::-webkit-scrollbar { width: 5px; }
+        .store-grid::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 5px; }
+        
+        .sword-item {
+            background: rgba(255, 215, 0, 0.05);
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .sword-info { display: flex; flex-direction: column; }
+        .sword-name { font-size: 1rem; color: #fff; }
+        .sword-rank { font-size: 0.8rem; }
+        .rank-e { color: #888; }
+        .rank-d { color: #4caf50; }
+        .rank-c { color: #2196f3; }
+        .rank-b { color: #9c27b0; }
+        .rank-a { color: #ff9800; }
+        .rank-s { color: var(--red-alert); text-shadow: 0 0 5px var(--red-alert); }
+        
+        .buy-btn {
+            background: transparent;
+            border: 1px solid var(--neon-pink);
+            color: var(--neon-pink);
+            padding: 5px 15px;
+            cursor: pointer;
+            font-family: 'Share Tech Mono', monospace;
+            transition: 0.2s;
+        }
+        .buy-btn:hover { background: rgba(255, 0, 255, 0.2); box-shadow: 0 0 10px rgba(255, 0, 255, 0.4); }
+        .buy-btn.owned {
+            border-color: #555; color: #555; cursor: not-allowed;
+            box-shadow: none; background: transparent;
+        }
+
+        /* Toast Notification */
+        #toast-container {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .toast {
+            background: rgba(10, 10, 10, 0.9);
+            border: 1px solid var(--neon-blue);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+            animation: toast-in 0.3s forwards, toast-out 0.3s 2.7s forwards;
+            font-family: 'Share Tech Mono', monospace;
+            text-align: center;
+        }
+        .toast.error { border-color: var(--red-alert); box-shadow: 0 0 10px rgba(255, 42, 42, 0.3); color: var(--red-alert); }
+        .toast.success { border-color: var(--green-safe); box-shadow: 0 0 10px rgba(0, 255, 0, 0.3); color: var(--green-safe); }
+        
+        @keyframes toast-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes toast-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-20px); } }
+
+        /* Penalty Screen */
+        #penalty-screen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255, 0, 0, 0.8);
+            z-index: 2000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s;
+        }
+        #penalty-screen.active {
+            opacity: 1;
+            pointer-events: all;
+            animation: flash-red 1s infinite alternate;
+        }
+        @keyframes flash-red { from { background: rgba(255, 0, 0, 0.7); } to { background: rgba(200, 0, 0, 0.9); } }
+        .penalty-text {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 4rem;
+            color: white;
+            text-shadow: 0 0 20px black;
+            text-align: center;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- HUD -->
+    <div class="hud-container">
+        <div class="store-btn" onclick="openWindow('store-window')">
+            <span>STORE</span>
+        </div>
+        <div class="diamond-counter">
+            <span>💎 <span id="diamond-val">0</span></span>
+        </div>
+    </div>
+
+    <!-- 1. Status Window -->
+    <div class="system-window active" id="status-window">
+        <div class="window-header">
+            <span class="header-title">[ STATUS ]</span>
+            <span class="close-btn" onclick="openWindow('quest-window')">[ X ]</span>
+        </div>
+        <div class="window-content">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h2 style="margin: 0; color: #fff; font-family: 'Rajdhani', sans-serif; letter-spacing: 1px;">NAME: SUBHAJIT</h2>
+                <p style="margin: 5px 0 0 0; color: #888;">JOB: NONE | <span style="color: var(--gold);">LEVEL: <span id="status-level">1</span></span></p>
+            </div>
+            
+            <div class="vitals">
+                <div class="vital-bar-container">
+                    <div class="vital-label"><span>HP</span><span>100/100</span></div>
+                    <div class="vital-bar"><div class="vital-fill fill-hp"></div></div>
+                </div>
+                <div class="vital-bar-container">
+                    <div class="vital-label"><span>MP</span><span>10/10</span></div>
+                    <div class="vital-bar"><div class="vital-fill fill-mp"></div></div>
+                </div>
+                <div class="vital-bar-container">
+                    <div class="vital-label"><span>FATIGUE</span><span>0</span></div>
+                    <div class="vital-bar"><div class="vital-fill fill-fatigue"></div></div>
+                </div>
+            </div>
+
+            <div class="status-grid">
+                <div class="stat-item"><div class="stat-label">STRENGTH</div><div class="stat-value">10</div></div>
+                <div class="stat-item"><div class="stat-label">AGILITY</div><div class="stat-value">10</div></div>
+                <div class="stat-item"><div class="stat-label">SENSE</div><div class="stat-value">10</div></div>
+                <div class="stat-item"><div class="stat-label">VITALITY</div><div class="stat-value">10</div></div>
+                <div class="stat-item"><div class="stat-label">INTELLIGENCE</div><div class="stat-value">10</div></div>
+                <div class="stat-item" style="border-color: var(--gold);"><div class="stat-label" style="color:var(--gold);">AP (AVAILABLE)</div><div class="stat-value" id="status-ap" style="color:var(--gold);">0</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Daily Quest Window -->
+    <div class="system-window" id="quest-window">
+        <div class="window-header">
+            <span class="header-title warning">! DAILY QUEST !</span>
+        </div>
+        <div class="window-content">
+            <div class="timer-container" id="timer-display">
+                TIME REMAINING: --:--:--
+            </div>
+            
+            <div class="level-indicator">
+                SYSTEM LEVEL: <span id="current-level">1</span> / 30
+            </div>
+
+            <div class="progress-container">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.8rem; color: #888;">
+                    <span>PROGRESS</span>
+                    <span id="progress-text">0%</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="quest-progress"></div>
+                </div>
+            </div>
+
+            <div class="task-list" id="task-container">
+                <!-- Tasks will be injected here via JS -->
+            </div>
+
+            <div class="ai-message" id="ai-msg"></div>
+
+            <button class="action-btn" id="level-up-btn" onclick="triggerLevelUp()">LEVEL UP</button>
+        </div>
+    </div>
+
+    <!-- 3. Reward & Buff Window -->
+    <div class="system-window" id="reward-window">
+        <div class="window-header">
+            <span class="header-title" style="color: var(--neon-pink);">[ QUEST CLEARED ]</span>
+        </div>
+        <div class="window-content">
+            <div class="reward-box">
+                <div class="reward-title">REWARDS OBTAINED</div>
+                <div class="reward-amount" id="diamond-reward-text">+0 💎</div>
+                
+                <p style="color: #ccc; margin-bottom: 15px; font-size: 0.9rem;">SELECT EXACTLY TWO GIFTS:</p>
+                
+                <div class="buff-grid">
+                    <div class="buff-item" onclick="toggleBuff(this)">1. RECOVERY</div>
+                    <div class="buff-item" onclick="toggleBuff(this)">2. MEDITATION</div>
+                    <div class="buff-item" onclick="toggleBuff(this)">3. FREE TIME</div>
+                    <div class="buff-item secret" onclick="toggleBuff(this)">4. S-RANK MYSTERY</div>
+                </div>
+                
+                <button class="action-btn" id="claim-buff-btn" onclick="claimRewards()">CLAIM GIFTS & FREEZE SYSTEM</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. System Store -->
+    <div class="system-window" id="store-window">
+        <div class="window-header">
+            <span class="header-title" style="color: var(--gold);">[ SYSTEM STORE ]</span>
+            <span class="close-btn" onclick="closeStore()">[ X ]</span>
+        </div>
+        <div class="window-content">
+            <p style="color: #888; text-align: center; margin-top: 0;">AVAILABLE DIAMONDS: <span id="store-diamond-val" style="color: var(--neon-pink);">0</span> 💎</p>
+            <div class="store-grid" id="store-inventory">
+                <!-- Swords injected via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Penalty Screen -->
+    <div id="penalty-screen">
+        <div class="penalty-text">
+            WARNING<br>
+            <span style="font-size: 2rem;">PENALTY ZONE ACTIVATED</span>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script>
+        // --- State Management ---
+        let state = {
+            level: 1,
+            diamonds: 0,
+            tasksCompleted: [],
+            isFrozen: false,
+            lastResetDate: new Date().toDateString(),
+            ownedSwords: []
+        };
+
+        // Load from LocalStorage (Simulating Firebase for PWA/APK)
+        const savedState = localStorage.getItem('combatOsState');
+        if (savedState) {
+            state = JSON.parse(savedState);
+        }
+
+        function saveState() {
+            localStorage.setItem('combatOsState', JSON.stringify(state));
+            updateUI();
+        }
+
+        // --- Data ---
+        const aiMessages = [
+            "পুশ-আপ ঠিক করে দে, নইলে পেনাল্টি জোনে পাঠাবো! 😈",
+            "পিস্টল স্কোয়াটে পা কাঁপলে এস-র‍্যাঙ্ক ক্যানসেল! 🤣",
+            "বালায়াম করো, নইলে জিন-উ এর মতো টাক পড়ে যাবে! 👴🏼😂",
+            "ওরকম দৌড়ালে গবলিনও ধরে ফেলবে! স্পিড বাড়াও! 🏃💨",
+            "শীর্ষাসন করছিস নাকি উল্টে পড়েছিস? 🙃",
+            "কিরে, স্ট্যামিনা শেষ? সাইতামা হাসছে কিন্তু! 🧑‍🦲",
+            "ডায়মন্ড পুশ-আপে বুক ফাটলে সিস্টেম দায়ী নয়! 💎💥",
+            "১০০ পুশ-আপ! সাইতামা হওয়ার প্ল্যান নাকি? 🤣"
+        ];
+
+        const swords = [
+            { name: "Rusty Iron Sword", rank: "E", price: 20 },
+            { name: "Goblin Dagger", rank: "E", price: 35 },
+            { name: "Steel Longsword", rank: "D", price: 50 },
+            { name: "Knight's Blade", rank: "D", price: 75 },
+            { name: "Assassin's Dirk", rank: "D", price: 90 },
+            { name: "Silver Rapier", rank: "C", price: 120 },
+            { name: "Orc Warlord's Axe", rank: "C", price: 150 },
+            { name: "Poison Fang", rank: "C", price: 180 },
+            { name: "Blood Knight's Sword", rank: "B", price: 250 },
+            { name: "Shadow Dagger", rank: "B", price: 300 },
+            { name: "Frostbite Blade", rank: "B", price: 350 },
+            { name: "Thunder Edge", rank: "A", price: 500 },
+            { name: "Dragon Bone Sword", rank: "A", price: 600 },
+            { name: "Soul Reaper", rank: "A", price: 750 },
+            { name: "Baruka's Dagger", rank: "A", price: 850 },
+            { name: "Knight Killer", rank: "A", price: 950 },
+            { name: "Demon King's Longsword", rank: "S", price: 1200 },
+            { name: "Kamish's Wrath", rank: "S", price: 2000 }
+        ];
+
+        // Fill remaining up to 30
+        for(let i=swords.length; i<30; i++) {
+            swords.push({ name: `Unknown Relic #${i+1}`, rank: "E", price: 10 + (i*2) });
+        }
+
+        function getTasksForLevel(lvl) {
+            if(lvl <= 15) {
+                return [
+                    { id: 0, text: "Push-ups", meta: "[ 50 Reps ]" },
+                    { id: 1, text: "Sit-ups", meta: "[ 50 Reps ]" },
+                    { id: 2, text: "Squats", meta: "[ 50 Reps ]" },
+                    { id: 3, text: "Run", meta: "[ 3 KM ]" },
+                    { id: 4, text: "অধোমুখ স্বানাসন (Downward Dog)", meta: "[ 1 Min ]" },
+                    { id: 5, text: "জাম্প স্কোয়াটস (Jump Squats)", meta: "[ 20 Reps ]" },
+                    { id: 6, text: "পিস্টল স্কোয়াট (Pistol Squat)", meta: "[ 10/Leg ]" },
+                    { id: 7, text: "ভুজঙ্গাসন (Cobra Pose)", meta: "[ 1 Min ]" },
+                    { id: 8, text: "উষ্ট্রাসন (Camel Pose)", meta: "[ 1 Min ]" },
+                    { id: 9, text: "শীর্ষাসন (Headstand)", meta: "[ 1 Min ]" },
+                    { id: 10, text: "বালায়াm (Balayam)", meta: "[ 5 Mins ]" }
+                ];
+            } else if (lvl <= 20) {
+                return [
+                    { id: 0, text: "Push-ups", meta: "[ 50 Reps ]" },
+                    { id: 1, text: "Sit-ups", meta: "[ 50 Reps ]" },
+                    { id: 2, text: "Squats", meta: "[ 50 Reps ]" },
+                    { id: 3, text: "Run", meta: "[ 3 KM ]" },
+                    { id: 4, text: "অধোমুখ স্বানাসন", meta: "[ 1 Min ]" },
+                    { id: 5, text: "জাম্প স্কোয়াটস", meta: "[ 20 Reps ]" },
+                    { id: 6, text: "পিস্টল স্কোয়াট", meta: "[ 10/Leg ]" },
+                    { id: 7, text: "ভুজঙ্গাসন", meta: "[ 1 Min ]" },
+                    { id: 8, text: "উষ্ট্রাসন", meta: "[ 1 Min ]" },
+                    { id: 9, text: "শীর্ষাসন", meta: "[ 1 Min ]" },
+                    { id: 10, text: "বালায়াm", meta: "[ 5 Mins ]" },
+                    { id: 11, text: "Pike Push-ups", meta: "[ 30 Reps ]" },
+                    { id: 12, text: "Diamond Push-ups", meta: "[ 30 Reps ]" },
+                    { id: 13, text: "Hindu Push-ups", meta: "[ 30 Reps ]" },
+                    { id: 14, text: "Hindu Squats", meta: "[ 30 Reps ]" }
+                ];
+            } else {
+                return [
+                    { id: 0, text: "Push-ups", meta: "[ 100 Reps ]" },
+                    { id: 1, text: "Sit-ups", meta: "[ 100 Reps ]" },
+                    { id: 2, text: "Squats", meta: "[ 100 Reps ]" },
+                    { id: 3, text: "Run", meta: "[ 5 KM ]" }
+                ];
+            }
+        }
+
+        // --- Core Logic ---
+
+        function showToast(msg, type='normal') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerText = msg;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        function openWindow(id) {
+            document.querySelectorAll('.system-window').forEach(w => w.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function closeStore() {
+            openWindow('quest-window');
+        }
+
+        function checkDailyReset() {
+            const now = new Date();
+            const resetHour = 1; // 1:00 AM
+            
+            // Logic to determine if we passed the reset time
+            let logicalCurrentDay = now.toDateString();
+            if(now.getHours() < resetHour) {
+                // If it's before 1AM, logical day is yesterday
+                let yesterday = new Date(now);
+                yesterday.setDate(yesterday.getDate() - 1);
+                logicalCurrentDay = yesterday.toDateString();
+            }
+
+            if (state.lastResetDate !== logicalCurrentDay) {
+                // Reset triggered
+                state.tasksCompleted = [];
+                state.isFrozen = false;
+                state.lastResetDate = logicalCurrentDay;
+                saveState();
+                showToast("System Reset for the new day!", "success");
+            }
+        }
+
+        function renderTasks() {
+            const container = document.getElementById('task-container');
+            container.innerHTML = '';
+            const tasks = getTasksForLevel(state.level);
+
+            tasks.forEach(task => {
+                const isCompleted = state.tasksCompleted.includes(task.id);
+                const el = document.createElement('div');
+                el.className = `task-item ${isCompleted ? 'completed' : ''}`;
+                
+                // If frozen, disable clicks
+                if(state.isFrozen) {
+                    el.style.pointerEvents = 'none';
+                    el.classList.add('completed'); // show everything as done if frozen
+                } else {
+                    el.onclick = () => toggleTask(task.id);
+                }
+
+                el.innerHTML = `
+                    <div class="checkbox"></div>
+                    <span class="task-text">${task.text}</span>
+                    <span class="task-meta">${task.meta}</span>
+                `;
+                container.appendChild(el);
+            });
+
+            updateProgress();
+        }
+
+        function toggleTask(id) {
+            if (state.isFrozen) return;
+
+            const index = state.tasksCompleted.indexOf(id);
+            if (index > -1) {
+                state.tasksCompleted.splice(index, 1);
+            } else {
+                state.tasksCompleted.push(id);
+                // Show AI Message
+                const msgEl = document.getElementById('ai-msg');
+                msgEl.innerText = aiMessages[Math.floor(Math.random() * aiMessages.length)];
+                msgEl.classList.add('show');
+                setTimeout(() => msgEl.classList.remove('show'), 3000);
+            }
+            saveState();
+            renderTasks();
+        }
+
+        function updateProgress() {
+            const tasks = getTasksForLevel(state.level);
+            let done = state.isFrozen ? tasks.length : state.tasksCompleted.length;
+            const percent = Math.floor((done / tasks.length) * 100);
+            
+            document.getElementById('quest-progress').style.width = `${percent}%`;
+            document.getElementById('progress-text').innerText = `${percent}%`;
+            
+            const btn = document.getElementById('level-up-btn');
+            if (percent === 100 && !state.isFrozen && state.level < 30) {
+                btn.classList.add('unlocked');
+                btn.innerText = "LEVEL UP";
+            } else if (state.isFrozen) {
+                btn.classList.remove('unlocked');
+                btn.innerText = "SYSTEM FROZEN";
+            } else if (state.level >= 30 && percent === 100) {
+                 btn.classList.remove('unlocked');
+                 btn.innerText = "MAX LEVEL REACHED";
+            } else {
+                btn.classList.remove('unlocked');
+                btn.innerText = "INCOMPLETE";
+            }
+        }
+
+        let pendingDiamondReward = 0;
+        function triggerLevelUp() {
+            const btn = document.getElementById('level-up-btn');
+            if (!btn.classList.contains('unlocked')) return;
+
+            // Generate Reward
+            pendingDiamondReward = Math.floor(Math.random() * (55 - 25 + 1)) + 25;
+            document.getElementById('diamond-reward-text').innerText = `+${pendingDiamondReward} 💎`;
+            
+            // Reset buff selections
+            document.querySelectorAll('.buff-item').forEach(b => b.classList.remove('selected'));
+            document.getElementById('claim-buff-btn').classList.remove('unlocked');
+            
+            openWindow('reward-window');
+        }
+
+        function toggleBuff(element) {
+            element.classList.toggle('selected');
+            const selectedCount = document.querySelectorAll('.buff-item.selected').length;
+            const btn = document.getElementById('claim-buff-btn');
+            
+            if (selectedCount === 2) {
+                btn.classList.add('unlocked');
+            } else if (selectedCount > 2) {
+                element.classList.remove('selected');
+                showToast("You can only select exactly 2 gifts!", "error");
+            } else {
+                btn.classList.remove('unlocked');
+            }
+        }
+
+        function claimRewards() {
+            const btn = document.getElementById('claim-buff-btn');
+            if (!btn.classList.contains('unlocked')) return;
+
+            state.diamonds += pendingDiamondReward;
+            state.level += 1;
+            state.isFrozen = true;
+            
+            // Increment AP visually in status
+            let ap = parseInt(document.getElementById('status-ap').innerText);
+            document.getElementById('status-ap').innerText = ap + 5;
+
+            saveState();
+            openWindow('quest-window');
+            showToast("Rewards Claimed! System frozen until 1:00 AM.", "success");
+        }
+
+        // --- Store Logic ---
+        function renderStore() {
+            const container = document.getElementById('store-inventory');
+            container.innerHTML = '';
+            
+            swords.forEach((s, idx) => {
+                const isOwned = state.ownedSwords.includes(idx);
+                const el = document.createElement('div');
+                el.className = 'sword-item';
+                el.innerHTML = `
+                    <div class="sword-info">
+                        <span class="sword-name">${s.name}</span>
+                        <span class="sword-rank rank-${s.rank.toLowerCase()}">Rank: ${s.rank}</span>
+                    </div>
+                    <button class="buy-btn ${isOwned ? 'owned' : ''}" onclick="buySword(${idx}, ${s.price})">
+                        ${isOwned ? 'OWNED' : s.price + ' 💎'}
+                    </button>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        function buySword(idx, price) {
+            if (state.ownedSwords.includes(idx)) return;
+            
+            if (state.diamonds >= price) {
+                state.diamonds -= price;
+                state.ownedSwords.push(idx);
+                saveState();
+                renderStore();
+                showToast("Item Acquired!", "success");
+            } else {
+                showToast("Not enough diamonds!", "error");
+            }
+        }
+
+        // --- Timer & Penalty Logic ---
+        function updateTimer() {
+            const now = new Date();
+            const resetTime = new Date();
+            resetTime.setHours(1, 0, 0, 0);
+            
+            if (now.getHours() >= 1) {
+                resetTime.setDate(resetTime.getDate() + 1);
+            }
+
+            const diff = resetTime - now;
+            
+            const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+            const m = Math.floor((diff / 1000 / 60) % 60);
+            const s = Math.floor((diff / 1000) % 60);
+            
+            const display = document.getElementById('timer-display');
+            
+            if (state.isFrozen) {
+                display.innerText = "QUEST COMPLETED! System frozen until 1:00 AM reset.";
+                display.classList.add('frozen');
+            } else {
+                display.innerText = `TIME REMAINING: ${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                display.classList.remove('frozen');
+                
+                // Penalty Check (If exactly 1 AM and not frozen/completed)
+                // We give a small buffer for the alert
+                if(now.getHours() === 1 && now.getMinutes() === 0 && now.getSeconds() < 2) {
+                     triggerPenalty();
+                }
+            }
+        }
+
+        function triggerPenalty() {
+            const screen = document.getElementById('penalty-screen');
+            screen.classList.add('active');
+            
+            // Web Audio API Siren
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(400, ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(800, ctx.currentTime + 0.5);
+                osc.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 1);
+            } catch(e) { console.log("Audio not supported"); }
+
+            setTimeout(() => {
+                screen.classList.remove('active');
+            }, 3000);
+        }
+
+        // --- Init ---
+        function updateUI() {
+            document.getElementById('diamond-val').innerText = state.diamonds;
+            document.getElementById('store-diamond-val').innerText = state.diamonds;
+            document.getElementById('status-level').innerText = state.level;
+            document.getElementById('current-level').innerText = state.level;
+            renderTasks();
+            renderStore();
+        }
+
+        setInterval(() => {
+            checkDailyReset();
+            updateTimer();
+        }, 1000);
+
+        checkDailyReset();
+        updateUI();
+        // Initial setup calls
+        updateTimer();
+
+    </script>
+</body>
+</html>
