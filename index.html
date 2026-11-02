@@ -241,6 +241,26 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+
+        /* ============ MUSIC PLAYER ============ */
+        .music-now { border: 1px solid rgba(0,210,255,0.35); background: rgba(0,0,0,0.45); padding: 12px; margin-bottom: 10px; box-shadow: inset 0 0 12px var(--neon-blue-dim); }
+        .music-title { font-weight: 700; font-size: 1.1rem; letter-spacing: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 8px; }
+        .music-seek { width: 100%; accent-color: #00d2ff; height: 22px; }
+        .music-btn { flex: 1; height: 46px; background: rgba(0,0,0,0.6); border: 1px solid var(--neon-blue); color: var(--neon-blue); font-size: 1.25rem; cursor: pointer; transition: all 0.2s; }
+        .music-btn:active { transform: scale(0.95); }
+        .music-btn.big { flex: 1.4; border-color: var(--neon-gold); color: var(--neon-gold); font-size: 1.5rem; }
+        .music-btn.on { border-color: var(--neon-gold); color: var(--neon-gold); box-shadow: 0 0 10px var(--neon-gold-glow); }
+        .music-select { flex: 1; min-width: 0; background: #02040a; color: var(--text-main); border: 1px solid var(--neon-blue); padding: 8px; font-family: 'Share Tech Mono', monospace; font-size: 0.9rem; }
+        .mini-btn { background: rgba(0,0,0,0.6); border: 1px solid #3b6f85; color: #9fe6ff; padding: 4px 10px; cursor: pointer; font-family: 'Share Tech Mono', monospace; font-size: 0.85rem; flex-shrink: 0; }
+        .mini-btn.danger { border-color: #7a2a2a; color: #ff7b7b; }
+        .song-row { display: flex; align-items: center; gap: 6px; padding: 10px 6px; border-bottom: 1px solid var(--neon-blue-dim); cursor: pointer; }
+        .song-row:hover { background: rgba(0,210,255,0.05); }
+        .song-row.playing { background: rgba(255,204,0,0.10); border-left: 3px solid var(--neon-gold); }
+        .song-row .snum { width: 26px; text-align: right; color: #64748b; font-family: 'Share Tech Mono', monospace; font-size: 0.8rem; flex-shrink: 0; }
+        .song-row .sname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; letter-spacing: 0.5px; }
+        .music-empty { text-align: center; color: #64748b; padding: 30px 10px; font-size: 0.95rem; line-height: 1.5; }
+        @media (max-width: 360px) { .global-hud { gap: 8px; right: 10px; } .btn-store { padding: 6px 10px; } .hud-panel { padding: 6px 10px; } }
+
         /* ============ HOLOGRAM TEXT (visual only, no layout change) ============ */
         /* every piece of text glows in its OWN colour, with a faint red/cyan split like a projected hologram */
         body :is(h1, h2, h3, p, span, div, label, button, b, strong) {
@@ -289,6 +309,89 @@
         @media (prefers-reduced-motion: reduce) {
             body h1, .system-msg-box, #countdown-timer { animation: none; }
         }
+
+        /* ============ HOLOGRAM BUTTONS & SWITCHES (visual only) ============ */
+        .hud-panel { color: var(--neon-pink); }
+
+        /* glass body, glowing edge in the button's OWN colour, faint projector scanlines */
+        body :is(.btn-store, .btn-action, .btn-buff, .btn-buy, .music-btn, .mini-btn, .hud-panel) {
+            position: relative;
+            overflow: hidden;
+            background-image:
+                repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 3px),
+                linear-gradient(180deg, color-mix(in srgb, currentColor 16%, transparent), transparent 65%);
+            box-shadow:
+                0 0 6px color-mix(in srgb, currentColor 55%, transparent),
+                0 0 16px color-mix(in srgb, currentColor 22%, transparent),
+                inset 0 0 14px color-mix(in srgb, currentColor 20%, transparent);
+            backdrop-filter: blur(2px);
+            transition: filter 0.15s, transform 0.15s, box-shadow 0.25s;
+        }
+        body .surprise-float { overflow: hidden; }
+
+        /* corner brackets, like a targeting reticle */
+        body :is(.btn-store, .btn-action, .btn-buff, .btn-buy, .music-btn, .mini-btn, .hud-panel, .surprise-float)::before {
+            content: '';
+            position: absolute;
+            inset: 3px;
+            pointer-events: none;
+            opacity: 0.85;
+            background:
+                linear-gradient(currentColor, currentColor) top left / 8px 1px no-repeat,
+                linear-gradient(currentColor, currentColor) top left / 1px 8px no-repeat,
+                linear-gradient(currentColor, currentColor) bottom right / 8px 1px no-repeat,
+                linear-gradient(currentColor, currentColor) bottom right / 1px 8px no-repeat;
+        }
+
+        /* light sheen sliding across every button now and then */
+        body :is(.btn-store, .btn-action, .btn-buff, .btn-buy, .music-btn, .mini-btn, .hud-panel, .surprise-float)::after {
+            content: '';
+            position: absolute;
+            top: 0; bottom: 0; left: -70%;
+            width: 40%;
+            pointer-events: none;
+            background: linear-gradient(100deg, transparent, rgba(255,255,255,0.30), transparent);
+            transform: skewX(-20deg);
+            animation: holo-shine 5s ease-in-out infinite;
+        }
+        body .btn-action::after { animation-duration: 4.2s; }
+        body .music-btn::after { animation-duration: 6s; }
+        body .btn-buff::after { animation-duration: 4.6s; }
+        body .hud-panel::after { animation-duration: 5.5s; }
+        @keyframes holo-shine { 0%, 55% { left: -70%; } 100% { left: 140%; } }
+
+        /* press / hover feedback */
+        body :is(.btn-store, .btn-action, .btn-buff, .btn-buy, .music-btn, .mini-btn):not(:disabled):hover { filter: brightness(1.25) saturate(1.2); }
+        body :is(.btn-store, .btn-action, .btn-buff, .btn-buy, .music-btn, .mini-btn):not(:disabled):active { filter: brightness(1.6); }
+        /* locked buttons look powered-down */
+        body :is(.btn-action, .btn-buy):disabled::after { display: none; }
+        body :is(.btn-action, .btn-buy):disabled::before { opacity: 0.3; }
+        body :is(.btn-action, .btn-buy):disabled { box-shadow: inset 0 0 8px rgba(255,255,255,0.05); }
+
+        /* task switches (checkboxes) */
+        body .custom-cb {
+            box-shadow: 0 0 7px var(--neon-blue-glow), inset 0 0 7px var(--neon-blue-dim);
+            background-image: linear-gradient(135deg, rgba(0,210,255,0.22), transparent 60%);
+        }
+        body .custom-cb:checked {
+            background-image: linear-gradient(135deg, #bff6ff, var(--neon-blue));
+            box-shadow: 0 0 14px var(--neon-blue), 0 0 28px var(--neon-blue-glow);
+            animation: holo-pulse 2.2s ease-in-out infinite;
+        }
+        @keyframes holo-pulse { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
+
+        /* music seek bar + playlist dropdown */
+        body .music-seek { -webkit-appearance: none; appearance: none; background: transparent; }
+        body .music-seek::-webkit-slider-runnable-track { height: 4px; background: linear-gradient(90deg, rgba(0,210,255,0.95), rgba(0,210,255,0.2)); box-shadow: 0 0 8px var(--neon-blue-glow); }
+        body .music-seek::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; background: #bff6ff; border: 1px solid #fff; transform: rotate(45deg); box-shadow: 0 0 10px var(--neon-blue), 0 0 22px var(--neon-blue-glow); }
+        body .music-seek::-moz-range-track { height: 4px; background: linear-gradient(90deg, rgba(0,210,255,0.95), rgba(0,210,255,0.2)); box-shadow: 0 0 8px var(--neon-blue-glow); }
+        body .music-seek::-moz-range-thumb { width: 12px; height: 12px; background: #bff6ff; border: 1px solid #fff; border-radius: 0; box-shadow: 0 0 10px var(--neon-blue), 0 0 22px var(--neon-blue-glow); }
+        body .music-select { background-image: linear-gradient(180deg, rgba(0,210,255,0.14), transparent 70%); box-shadow: 0 0 8px var(--neon-blue-glow), inset 0 0 12px var(--neon-blue-dim); }
+
+        @media (prefers-reduced-motion: reduce) {
+            body :is(.btn-store, .btn-action, .btn-buff, .btn-buy, .music-btn, .mini-btn, .hud-panel, .surprise-float)::after,
+            body .custom-cb:checked { animation: none; }
+        }
     </style>
 </head>
 <body>
@@ -304,6 +407,7 @@
 
     <!-- GLOBAL HUD -->
     <div class="global-hud">
+        <button id="btn-open-music" class="btn-store view-hidden"><span>🎵 MUSIC</span></button>
         <button id="btn-open-store" class="btn-store view-hidden"><span>🛒 STORE</span></button>
         <div class="hud-panel">
             <div class="hud-inner">
@@ -446,6 +550,46 @@
         <div class="pt-2">
             <button id="btn-extra-levelup" disabled class="btn-action">Extra Level Up</button>
             <button id="btn-extra-back" class="btn-action back-btn mt-2" style="font-size:1rem; padding:8px;">BACK TO QUESTS</button>
+        </div>
+    </div>
+
+    <!-- ================= 8. MUSIC PLAYER ================= -->
+    <div id="win-music" class="system-panel view-hidden" style="height: 88vh; max-width: 560px;">
+        <div class="flex justify-between items-center mb-3 border-b border-[#00d2ff55] pb-2">
+            <h1 class="sys-font text-2xl font-bold text-glow-blue tracking-[0.15em] uppercase">[ MUSIC ]</h1>
+            <span id="music-close" class="sys-font text-2xl text-glow-red font-bold btn-close px-2" title="Close">[ X ]</span>
+        </div>
+
+        <div class="music-now">
+            <div id="music-title" class="music-title sys-font text-glow-gold">NO SONG SELECTED</div>
+            <input id="music-seek" type="range" min="0" max="1000" value="0" class="music-seek">
+            <div class="flex justify-between sys-font text-xs text-gray-400 mb-2"><span id="music-cur">0:00</span><span id="music-dur">0:00</span></div>
+            <div class="flex gap-2">
+                <button id="music-shuffle" class="music-btn" title="Shuffle">🔀</button>
+                <button id="music-prev" class="music-btn" title="Previous">⏮</button>
+                <button id="music-play" class="music-btn big" title="Play / Pause">▶</button>
+                <button id="music-next" class="music-btn" title="Next">⏭</button>
+                <button id="music-repeat" class="music-btn" title="Repeat">🔁</button>
+            </div>
+        </div>
+
+        <div class="flex gap-2 mb-2">
+            <select id="music-select" class="music-select"></select>
+            <button id="music-new" class="mini-btn">＋ PLAYLIST</button>
+            <button id="music-del-pl" class="mini-btn danger" title="Delete this playlist">🗑</button>
+        </div>
+
+        <div class="scroll-list" id="music-list"></div>
+
+        <input type="file" id="music-file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.opus,.flac" multiple style="display:none">
+        <button id="music-add" class="btn-action back-btn" style="font-size:1.05rem;">＋ ADD SONGS FROM PHONE</button>
+    </div>
+
+    <div id="music-chooser" class="surprise-overlay">
+        <div class="surprise-box" style="border-color: var(--neon-blue); box-shadow: 0 0 30px var(--neon-blue-glow);">
+            <h1 class="sys-font text-xl font-bold text-glow-blue tracking-widest uppercase mb-3">[ ADD TO PLAYLIST ]</h1>
+            <div id="music-chooser-list" style="max-height: 40vh; overflow-y: auto;"></div>
+            <button id="music-chooser-cancel" class="btn-action back-btn mt-3" style="font-size:1rem;">CANCEL</button>
         </div>
     </div>
 
@@ -795,6 +939,7 @@
         }
 
         function saveState() {
+            if (window.__resetting) return;
             try { localStorage.setItem(STORAGE_KEY, JSON.stringify(playerState)); }
             catch (e) { console.warn('Save failed', e); }
         }
@@ -817,6 +962,7 @@
         function triggerPenalty() {
             if (penaltyTriggered) return;
             penaltyTriggered = true;
+            if (window.__musicPause) window.__musicPause();
             
             document.querySelectorAll('.system-panel').forEach(p => {
                 p.classList.remove('view-active');
@@ -1158,6 +1304,360 @@
             switchView(document.getElementById('win-store'), document.getElementById('win-quest'));
             document.getElementById('btn-open-store').classList.remove('view-hidden');
         });
+
+        // ================= MUSIC PLAYER (songs live in the phone's IndexedDB) =================
+        (function () {
+            const KEY = 'soloLevelingMusic_v1';
+            let st = { playlists: [], view: 'all', shuffle: false, repeat: 'off' };
+            try { const raw = localStorage.getItem(KEY); if (raw) st = { ...st, ...JSON.parse(raw) }; } catch (e) {}
+            const saveSt = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
+            const $ = id => document.getElementById(id);
+
+            const listEl = $('music-list'), selectEl = $('music-select'), fileEl = $('music-file');
+            const titleEl = $('music-title'), seekEl = $('music-seek'), curEl = $('music-cur'), durEl = $('music-dur');
+            const playBtn = $('music-play'), shuffleBtn = $('music-shuffle'), repeatBtn = $('music-repeat');
+            const storeBtn = $('btn-open-store'), musicBtn = $('btn-open-music');
+
+            // keep the MUSIC button visible exactly when the STORE button is
+            const syncBtn = () => musicBtn.classList.toggle('view-hidden', storeBtn.classList.contains('view-hidden'));
+            new MutationObserver(syncBtn).observe(storeBtn, { attributes: true, attributeFilter: ['class'] });
+            syncBtn();
+
+            // ---------- IndexedDB: 'meta' (name, size) and 'blobs' (the audio files) ----------
+            let dbPromise = null;
+            function openDb() {
+                if (!dbPromise) dbPromise = new Promise((res, rej) => {
+                    const r = indexedDB.open('sl-music', 1);
+                    r.onupgradeneeded = () => { const d = r.result; d.createObjectStore('meta', { keyPath: 'id' }); d.createObjectStore('blobs'); };
+                    r.onsuccess = () => res(r.result);
+                    r.onerror = () => rej(r.error);
+                });
+                return dbPromise;
+            }
+            const reqP = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+            const txDone = t => new Promise((res, rej) => { t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); });
+            async function dbAllMeta() { const d = await openDb(); return reqP(d.transaction('meta').objectStore('meta').getAll()); }
+            async function dbPutSong(meta, blob) { const d = await openDb(); const t = d.transaction(['meta', 'blobs'], 'readwrite'); t.objectStore('meta').put(meta); t.objectStore('blobs').put(blob, meta.id); return txDone(t); }
+            async function dbBlob(id) { const d = await openDb(); return reqP(d.transaction('blobs').objectStore('blobs').get(id)); }
+            async function dbDelSong(id) { const d = await openDb(); const t = d.transaction(['meta', 'blobs'], 'readwrite'); t.objectStore('meta').delete(id); t.objectStore('blobs').delete(id); return txDone(t); }
+
+            // ---------- state ----------
+            let songs = [];
+            const byId = id => songs.find(s => s.id === id);
+            const audio = new Audio();
+            audio.preload = 'auto';
+            let curId = null, curUrl = null, queue = [], queueView = 'all', playToken = 0, seeking = false;
+
+            function currentIds() {
+                if (st.view === 'all') return songs.map(s => s.id);
+                const pl = st.playlists.find(p => p.id === st.view);
+                if (!pl) { st.view = 'all'; return songs.map(s => s.id); }
+                return pl.songIds.filter(byId);
+            }
+            const curPlaylist = () => st.playlists.find(p => p.id === st.view);
+            const fmt = t => { if (!isFinite(t)) return '0:00'; t = Math.floor(t); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
+            const refreshQueueIfSameView = () => { if (queueView === st.view) queue = currentIds().slice(); };
+
+            // ---------- playback ----------
+            async function playSong(id, newQueue) {
+                if (newQueue) { queue = newQueue; queueView = st.view; }
+                const token = ++playToken;
+                let blob;
+                try { blob = await dbBlob(id); } catch (e) { blob = null; }
+                if (token !== playToken) return;
+                if (!blob) { showToast('গানটা খুঁজে পাওয়া গেল না', 'error'); return; }
+                if (curUrl) URL.revokeObjectURL(curUrl);
+                curUrl = URL.createObjectURL(blob);
+                curId = id;
+                audio.src = curUrl;
+                const s = byId(id);
+                titleEl.textContent = s ? s.name : '';
+                seekEl.value = 0; curEl.textContent = '0:00'; durEl.textContent = '0:00';
+                setMedia(s);
+                try { await audio.play(); } catch (e) { /* user can press play */ }
+                render();
+            }
+
+            function pickNext(dir, auto) {
+                if (!queue.length) return null;
+                if (st.shuffle && queue.length > 1) {
+                    let n; do { n = queue[Math.floor(Math.random() * queue.length)]; } while (n === curId);
+                    return n;
+                }
+                let i = queue.indexOf(curId) + dir;
+                if (i >= queue.length) { if (auto && st.repeat !== 'all') return null; i = 0; }
+                if (i < 0) i = queue.length - 1;
+                return queue[i];
+            }
+            function next(auto) {
+                if (auto && st.repeat === 'one' && curId) { audio.currentTime = 0; audio.play().catch(() => {}); return; }
+                const n = pickNext(1, auto);
+                if (n) playSong(n); else { audio.pause(); render(); }
+            }
+            function prev() {
+                if (audio.currentTime > 3) { audio.currentTime = 0; return; }
+                const n = pickNext(-1, false);
+                if (n) playSong(n);
+            }
+            function togglePlay() {
+                if (!curId) {
+                    const ids = currentIds();
+                    if (!ids.length) { showToast('আগে গান যোগ কর! 🎵', 'error'); return; }
+                    const first = st.shuffle ? ids[Math.floor(Math.random() * ids.length)] : ids[0];
+                    playSong(first, ids.slice());
+                    return;
+                }
+                if (audio.paused) audio.play().catch(() => {}); else audio.pause();
+            }
+            window.__musicPause = () => { try { audio.pause(); } catch (e) {} };
+            window.__musicDebug = () => ({ cur: curId, paused: audio.paused, t: audio.currentTime, hasSrc: !!audio.src, queue: queue.slice(), songs: songs.length });
+
+            function setMedia(s) {
+                if (!('mediaSession' in navigator) || !s || typeof MediaMetadata === 'undefined') return;
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: s.name, artist: 'Solo Leveling System', album: 'Shadow Monarch Playlist',
+                    artwork: [{ src: 'icon-512.png', sizes: '512x512', type: 'image/png' }]
+                });
+            }
+            if ('mediaSession' in navigator) {
+                const set = (a, f) => { try { navigator.mediaSession.setActionHandler(a, f); } catch (e) {} };
+                set('play', () => audio.play().catch(() => {}));
+                set('pause', () => audio.pause());
+                set('previoustrack', prev);
+                set('nexttrack', () => next(false));
+                set('seekto', d => { if (d && d.seekTime != null) audio.currentTime = d.seekTime; });
+            }
+
+            audio.addEventListener('ended', () => next(true));
+            audio.addEventListener('play', () => { playBtn.textContent = '⏸'; if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'; });
+            audio.addEventListener('pause', () => { playBtn.textContent = '▶'; if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused'; });
+            audio.addEventListener('loadedmetadata', () => { durEl.textContent = fmt(audio.duration); });
+            audio.addEventListener('timeupdate', () => {
+                if (seeking) return;
+                curEl.textContent = fmt(audio.currentTime);
+                if (audio.duration && isFinite(audio.duration)) seekEl.value = Math.round(audio.currentTime / audio.duration * 1000);
+            });
+            audio.addEventListener('error', () => { showToast('এই ফাইলটা ফোনের ব্রাউজারে চলছে না ⚠️', 'error'); });
+            seekEl.addEventListener('input', () => { seeking = true; if (audio.duration) curEl.textContent = fmt(seekEl.value / 1000 * audio.duration); });
+            seekEl.addEventListener('change', () => { if (audio.duration) audio.currentTime = seekEl.value / 1000 * audio.duration; seeking = false; });
+
+            // ---------- rendering ----------
+            function mkBtn(text, cls, title, fn) {
+                const b = document.createElement('button');
+                b.className = 'mini-btn' + (cls ? ' ' + cls : '');
+                b.textContent = text; if (title) b.title = title;
+                b.addEventListener('click', e => { e.stopPropagation(); fn(); });
+                return b;
+            }
+
+            function render() {
+                selectEl.innerHTML = '';
+                const all = document.createElement('option');
+                all.value = 'all'; all.textContent = `🎵 ALL SONGS (${songs.length})`;
+                selectEl.appendChild(all);
+                st.playlists.forEach(p => {
+                    const o = document.createElement('option');
+                    o.value = p.id; o.textContent = `📁 ${p.name} (${p.songIds.filter(byId).length})`;
+                    selectEl.appendChild(o);
+                });
+                if (st.view !== 'all' && !st.playlists.some(p => p.id === st.view)) st.view = 'all';
+                selectEl.value = st.view;
+                $('music-del-pl').style.display = st.view === 'all' ? 'none' : 'inline-block';
+
+                const ids = currentIds();
+                listEl.innerHTML = '';
+                if (!ids.length) {
+                    const d = document.createElement('div');
+                    d.className = 'music-empty sys-font';
+                    d.textContent = st.view === 'all'
+                        ? 'কোনো গান নেই। নিচের "ADD SONGS" চেপে ফোন থেকে গান বেছে নে (একসাথে অনেকগুলো নেওয়া যায়)।'
+                        : 'এই প্লেলিস্ট খালি। ADD SONGS চাপলে গান এই প্লেলিস্টে যোগ হবে, অথবা ALL SONGS-এ গিয়ে ＋ চাপ।';
+                    listEl.appendChild(d);
+                }
+                ids.forEach((id, i) => {
+                    const s = byId(id);
+                    const row = document.createElement('div');
+                    row.className = 'song-row' + (id === curId ? ' playing' : '');
+                    const num = document.createElement('span'); num.className = 'snum'; num.textContent = id === curId ? '▶' : String(i + 1);
+                    const name = document.createElement('span'); name.className = 'sname'; name.textContent = s.name;
+                    row.appendChild(num); row.appendChild(name);
+                    if (st.view === 'all') {
+                        row.appendChild(mkBtn('＋', '', 'Add to playlist', () => openChooser(id)));
+                        row.appendChild(mkBtn('🗑', 'danger', 'Delete song', () => deleteSong(id)));
+                    } else {
+                        row.appendChild(mkBtn('▲', '', 'Move up', () => moveInPlaylist(i, -1)));
+                        row.appendChild(mkBtn('▼', '', 'Move down', () => moveInPlaylist(i, 1)));
+                        row.appendChild(mkBtn('✕', 'danger', 'Remove from playlist', () => removeFromPlaylist(id)));
+                    }
+                    row.addEventListener('click', () => playSong(id, ids.slice()));
+                    listEl.appendChild(row);
+                });
+
+                shuffleBtn.classList.toggle('on', st.shuffle);
+                repeatBtn.classList.toggle('on', st.repeat !== 'off');
+                repeatBtn.textContent = st.repeat === 'one' ? '🔂' : '🔁';
+                playBtn.textContent = audio.paused ? '▶' : '⏸';
+            }
+
+            // ---------- playlist actions ----------
+            function moveInPlaylist(i, d) {
+                const pl = curPlaylist(); if (!pl) return;
+                const j = i + d; if (j < 0 || j >= pl.songIds.length) return;
+                [pl.songIds[i], pl.songIds[j]] = [pl.songIds[j], pl.songIds[i]];
+                saveSt(); refreshQueueIfSameView(); render();
+            }
+            function removeFromPlaylist(id) {
+                const pl = curPlaylist(); if (!pl) return;
+                pl.songIds = pl.songIds.filter(x => x !== id);
+                saveSt(); refreshQueueIfSameView(); render();
+            }
+            function newPlaylist() {
+                const name = (prompt('নতুন প্লেলিস্টের নাম কী?') || '').trim();
+                if (!name) return null;
+                const pl = { id: 'p' + Date.now().toString(36), name: name.slice(0, 30), songIds: [] };
+                st.playlists.push(pl); st.view = pl.id;
+                saveSt(); render();
+                return pl;
+            }
+            function deletePlaylist() {
+                const pl = curPlaylist(); if (!pl) return;
+                if (!confirm(`"${pl.name}" প্লেলিস্টটা মুছবি? (গানগুলো ALL SONGS-এ থেকে যাবে)`)) return;
+                st.playlists = st.playlists.filter(p => p.id !== pl.id);
+                st.view = 'all'; saveSt(); render();
+            }
+            function addToPlaylist(plId, songId) {
+                const pl = st.playlists.find(p => p.id === plId); if (!pl) return;
+                if (pl.songIds.includes(songId)) { showToast('এই গান আগে থেকেই প্লেলিস্টে আছে', 'error'); return; }
+                pl.songIds.push(songId); saveSt(); render();
+                showToast(`"${pl.name}"-এ যোগ হয়েছে 📁`, 'success');
+            }
+            function openChooser(songId) {
+                const box = $('music-chooser-list');
+                box.innerHTML = '';
+                st.playlists.forEach(p => {
+                    const b = document.createElement('button');
+                    b.className = 'btn-action back-btn mb-2';
+                    b.style.cssText = 'font-size:1rem; padding:10px; letter-spacing:1px;';
+                    b.textContent = '📁 ' + p.name;
+                    b.addEventListener('click', () => { $('music-chooser').style.display = 'none'; addToPlaylist(p.id, songId); });
+                    box.appendChild(b);
+                });
+                const nb = document.createElement('button');
+                nb.className = 'btn-action ready mb-2';
+                nb.style.cssText = 'font-size:1rem; padding:10px; letter-spacing:1px;';
+                nb.textContent = '＋ নতুন প্লেলিস্ট';
+                nb.addEventListener('click', () => {
+                    $('music-chooser').style.display = 'none';
+                    const keep = st.view;
+                    const pl = newPlaylist();
+                    if (pl) { addToPlaylist(pl.id, songId); } else { st.view = keep; render(); }
+                });
+                box.appendChild(nb);
+                $('music-chooser').style.display = 'flex';
+            }
+            $('music-chooser-cancel').addEventListener('click', () => { $('music-chooser').style.display = 'none'; });
+
+            async function deleteSong(id) {
+                const s = byId(id); if (!s) return;
+                if (!confirm(`"${s.name}" গানটা মুছে ফেলবি?`)) return;
+                try { await dbDelSong(id); } catch (e) {}
+                songs = songs.filter(x => x.id !== id);
+                st.playlists.forEach(p => { p.songIds = p.songIds.filter(x => x !== id); });
+                queue = queue.filter(x => x !== id);
+                if (curId === id) {
+                    audio.pause(); audio.removeAttribute('src'); audio.load();
+                    if (curUrl) { URL.revokeObjectURL(curUrl); curUrl = null; }
+                    curId = null; titleEl.textContent = 'NO SONG SELECTED';
+                    seekEl.value = 0; curEl.textContent = '0:00'; durEl.textContent = '0:00';
+                }
+                saveSt(); render();
+            }
+
+            // ---------- adding songs ----------
+            $('music-add').addEventListener('click', () => fileEl.click());
+            fileEl.addEventListener('change', async () => {
+                const files = Array.from(fileEl.files || []);
+                if (!files.length) return;
+                try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+                const addedIds = []; let skipped = 0, failed = false;
+                for (const f of files) {
+                    if (!(f.type.startsWith('audio/') || /\.(mp3|m4a|aac|wav|ogg|opus|flac)$/i.test(f.name))) { skipped++; continue; }
+                    const id = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+                    const meta = { id, name: f.name.replace(/\.[^.]+$/, ''), size: f.size, addedAt: Date.now() + addedIds.length };
+                    try { await dbPutSong(meta, f); songs.push(meta); addedIds.push(id); }
+                    catch (e) { failed = true; break; }
+                }
+                fileEl.value = '';
+                const pl = curPlaylist();
+                if (pl) pl.songIds.push(...addedIds);
+                saveSt(); refreshQueueIfSameView(); render();
+                if (failed) showToast('ফোনের স্টোরেজ ভরে গেছে, সব গান সেভ হয়নি ⚠️', 'error');
+                else if (addedIds.length) showToast(`${addedIds.length}টা গান যোগ হয়েছে 🎵` + (skipped ? ` (${skipped}টা গান না, বাদ)` : ''), 'success');
+                else if (skipped) showToast('এগুলো গানের ফাইল না', 'error');
+            });
+
+            // ---------- controls ----------
+            playBtn.addEventListener('click', togglePlay);
+            $('music-next').addEventListener('click', () => { if (curId || currentIds().length) { if (!curId) togglePlay(); else next(false); } });
+            $('music-prev').addEventListener('click', () => { if (curId) prev(); });
+            shuffleBtn.addEventListener('click', () => { st.shuffle = !st.shuffle; saveSt(); render(); });
+            repeatBtn.addEventListener('click', () => { st.repeat = st.repeat === 'off' ? 'all' : (st.repeat === 'all' ? 'one' : 'off'); saveSt(); render(); });
+            selectEl.addEventListener('change', () => { st.view = selectEl.value; saveSt(); render(); });
+            $('music-new').addEventListener('click', newPlaylist);
+            $('music-del-pl').addEventListener('click', deletePlaylist);
+
+            // ---------- open / close ----------
+            musicBtn.addEventListener('click', () => {
+                render();
+                switchView($('win-quest'), $('win-music'));
+                storeBtn.classList.add('view-hidden');
+            });
+            $('music-close').addEventListener('click', () => {
+                switchView($('win-music'), $('win-quest'));
+                storeBtn.classList.remove('view-hidden');
+            });
+
+            // ---------- boot: load saved library ----------
+            dbAllMeta().then(m => { songs = m.sort((a, b) => a.addedAt - b.addedAt); render(); }).catch(() => { render(); });
+        })();
+
+        // ================= SECRET RESET: hold the STORE button for 10 seconds =================
+        (function () {
+            const HOLD_MS = 10000;
+            const btn = document.getElementById('btn-open-store');
+            const label = btn.querySelector('span');
+            const normalText = label.textContent;
+            let startTime = 0, tickTimer = null, fireTimer = null;
+
+            btn.style.webkitTouchCallout = 'none';
+            btn.style.userSelect = 'none';
+
+            function stopHold() {
+                clearTimeout(fireTimer);
+                clearInterval(tickTimer);
+                fireTimer = null; tickTimer = null;
+                label.textContent = normalText;
+            }
+
+            function startHold() {
+                stopHold();
+                startTime = Date.now();
+                // after 3 seconds of holding, show a countdown so you know a reset is coming
+                tickTimer = setInterval(() => {
+                    const elapsed = Date.now() - startTime;
+                    if (elapsed >= 3000) label.textContent = `⚠ RESET ${Math.max(1, Math.ceil((HOLD_MS - elapsed) / 1000))}s`;
+                }, 200);
+                fireTimer = setTimeout(() => {
+                    window.__resetting = true;
+                    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+                    location.reload();
+                }, HOLD_MS);
+            }
+
+            btn.addEventListener('pointerdown', startHold);
+            ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, stopHold));
+            btn.addEventListener('contextmenu', e => e.preventDefault());
+        })();
 
         // ================= BOOTSTRAP APP =================
         function bootSystem() {
