@@ -199,6 +199,13 @@
             font-size: 1.1rem;
         }
 
+        /* SS Rank + Surprise Quest */
+        .rank-SS { border-color: #ff2a2a; box-shadow: inset 0 0 18px rgba(255,42,42,0.35), 0 0 10px rgba(255,42,42,0.25); }
+        .surprise-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.78); z-index: 700; display: none; align-items: center; justify-content: center; padding: 16px; }
+        .surprise-box { background: rgba(20, 0, 5, 0.95); border: 2px solid var(--neon-red); box-shadow: 0 0 40px var(--neon-red-glow), inset 0 0 25px rgba(255,42,42,0.25); width: 100%; max-width: 420px; padding: 24px; text-align: center; animation: pop-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+        .surprise-float { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 250; display: none; padding: 8px 18px; background: rgba(20,0,5,0.9); border: 1px solid var(--neon-red); color: var(--neon-red); text-shadow: 0 0 8px var(--neon-red-glow); font-family: 'Share Tech Mono', monospace; font-weight: bold; letter-spacing: 2px; cursor: pointer; animation: pulse-red 1s infinite; }
+        @keyframes pulse-red { 0%, 100% { box-shadow: 0 0 8px rgba(255,42,42,0.4); } 50% { box-shadow: 0 0 22px var(--neon-red-glow); } }
+
         /* Loading Overlay */
         #loader {
             position: fixed; inset: 0; background: var(--bg-color); z-index: 9999;
@@ -282,6 +289,7 @@
 
         <div class="pt-2">
             <button id="btn-levelup" disabled class="btn-action">Level Up</button>
+            <button id="btn-open-extra" class="btn-action back-btn mt-2" style="font-size:1rem; padding:8px; letter-spacing:3px;">💪 EXTRA EXERCISE</button>
         </div>
     </div>
 
@@ -347,6 +355,43 @@
     </div>
 
 
+    <!-- ================= 7. EXTRA TRAINING ================= -->
+    <div id="win-extra" class="system-panel view-hidden" style="height: 85vh;">
+        <div class="text-center mb-1">
+            <h1 class="sys-font text-3xl font-bold text-glow-gold tracking-[0.1em] uppercase">[ EXTRA TRAINING ]</h1>
+            <p class="sys-font text-xs text-gray-400 tracking-widest mt-1">আলাদা লেভেল · কোনো টাইমার নেই · যখন খুশি</p>
+        </div>
+        <div class="px-2 my-3">
+            <div class="flex justify-between sys-font text-sm font-bold mb-1 tracking-widest">
+                <span class="text-glow-gold" id="extra-lbl-curr">EXTRA LVL 1</span>
+                <span class="text-glow-blue" id="extra-lbl-progress">0%</span>
+                <span class="text-gray-500" id="extra-lbl-next">LVL 2</span>
+            </div>
+            <div class="bar-bg"><div id="extra-progress-bar" class="bar-fill progress" style="background: var(--neon-gold); box-shadow: 0 0 15px var(--neon-gold-glow);"></div></div>
+        </div>
+        <div class="scroll-list" id="extra-task-container"></div>
+        <div class="pt-2">
+            <button id="btn-extra-levelup" disabled class="btn-action">Extra Level Up</button>
+            <button id="btn-extra-back" class="btn-action back-btn mt-2" style="font-size:1rem; padding:8px;">BACK TO QUESTS</button>
+        </div>
+    </div>
+
+    <!-- ================= SURPRISE QUEST ================= -->
+    <div id="surprise-modal" class="surprise-overlay">
+        <div class="surprise-box">
+            <h1 class="sys-font text-2xl font-bold text-glow-red tracking-widest uppercase mb-2">[ ⚠ SURPRISE QUEST ]</h1>
+            <p class="sys-font text-sm text-gray-300 tracking-widest mb-4 uppercase">সিস্টেম একটা ইমার্জেন্সি কোয়েস্ট ডিটেক্ট করেছে!</p>
+            <div class="border-y border-[rgba(255,42,42,0.4)] py-4 my-3 bg-[rgba(255,42,42,0.06)]">
+                <div id="surprise-title" class="font-bold text-2xl tracking-wide uppercase text-[#d4f0ff]"></div>
+                <div id="surprise-time" class="sys-font text-lg text-glow-gold mt-1 tracking-widest"></div>
+            </div>
+            <p class="sys-font text-xl text-glow-pink font-bold mb-4">REWARD: +300 💎</p>
+            <button id="btn-surprise-done" class="btn-action ready mb-3" style="font-size:1.1rem; letter-spacing:2px;">COMPLETED ✔</button>
+            <button id="btn-surprise-later" class="btn-action back-btn" style="font-size:1rem;">LATER</button>
+        </div>
+    </div>
+    <button id="btn-surprise-float" class="surprise-float">⚠ SURPRISE QUEST</button>
+
     <!-- System Logic (saves to phone memory via localStorage) -->
     <script>
         // ================= LOCAL STORAGE SAVE =================
@@ -365,10 +410,18 @@
             ownedSwords: [],
             completedTasks: [],
             lastDate: getSystemDay(new Date()),
-            questCompletedForToday: false
+            questCompletedForToday: false,
+            surpriseThreshold: 0,
+            surpriseStatus: 'none',
+            surpriseIdx: 0,
+            extraLevel: 1,
+            extraDone: [],
+            paidTasks: [],
+            paidExtra: []
         };
 
         const maxLevel = 30;
+        const EXERCISE_REWARD = 10; // diamonds per exercise
         let pendingDiamonds = 0;
         let currentTaskCount = 0;
         let penaltyTriggered = false;
@@ -450,6 +503,194 @@
             { id: 30, name: "Architect's Masterpiece", rank: "S", price: 5000, icon: "👁️‍🗨️" }
         ];
 
+        // ================= EXTRA DEADLY WEAPONS =================
+        swordData.push(
+            { id: 31, name: "Hellfire Greataxe", rank: "S", price: 6000, icon: "🪓" },
+            { id: 32, name: "Soul Reaper Scythe", rank: "S", price: 7000, icon: "☠️" },
+            { id: 33, name: "Dragon Slayer Odachi", rank: "SS", price: 8500, icon: "🐲" },
+            { id: 34, name: "Executioner's Chainblade", rank: "SS", price: 10000, icon: "⛓️" },
+            { id: 35, name: "Thunder God's Hammer", rank: "SS", price: 12000, icon: "🔨" },
+            { id: 36, name: "Abyssal Trident", rank: "SS", price: 14000, icon: "🔱" },
+            { id: 37, name: "Crimson Moon Glaive", rank: "SS", price: 16000, icon: "🌙" },
+            { id: 38, name: "Black Hole Edge", rank: "SS", price: 20000, icon: "🕳️" },
+            { id: 39, name: "Shadow Monarch's Dual Fangs", rank: "SS", price: 25000, icon: "🦇" },
+            { id: 40, name: "Ruler's Authority Blade", rank: "SS", price: 35000, icon: "🌀" }
+        );
+
+        // ================= SURPRISE QUEST =================
+        const SURPRISE_REWARD = 300;
+        const surpriseQuests = [
+            { title: "20 Burpees", time: "20 Reps" },
+            { title: "1 Min Plank", time: "60 Sec" },
+            { title: "40 Mountain Climbers", time: "40 Reps" },
+            { title: "30 Jumping Jacks", time: "30 Reps" },
+            { title: "20 Lunges", time: "10 Per Leg" },
+            { title: "2 Min Wall Sit", time: "120 Sec" },
+            { title: "২০টি জাম্প স্কোয়াট", time: "20 Reps" },
+            { title: "২৫টি ডায়মন্ড পুশ-আপ", time: "25 Reps" }
+        ];
+
+        function rollSurprise() {
+            playerState.surpriseThreshold = 3 + Math.floor(Math.random() * 2); // 3 or 4 tasks
+            playerState.paidTasks = []; // new day: exercise diamonds can be earned again
+            playerState.surpriseStatus = 'none';
+            playerState.surpriseIdx = Math.floor(Math.random() * surpriseQuests.length);
+            updateSurpriseUI();
+        }
+
+        function updateSurpriseUI() {
+            const btn = document.getElementById('btn-surprise-float');
+            if (btn) btn.style.display = (playerState.surpriseStatus === 'pending' && !penaltyTriggered) ? 'block' : 'none';
+        }
+
+        function checkSurprise() {
+            if (playerState.surpriseStatus !== 'none') return;
+            if (playerState.completedTasks.length >= playerState.surpriseThreshold) {
+                playerState.surpriseStatus = 'pending';
+                saveState();
+                updateSurpriseUI();
+                // pops up at a random moment, not exactly on the click
+                setTimeout(openSurprise, 1000 + Math.random() * 6000);
+            }
+        }
+
+        function openSurprise() {
+            if (playerState.surpriseStatus !== 'pending' || penaltyTriggered) return;
+            const q = surpriseQuests[playerState.surpriseIdx] || surpriseQuests[0];
+            document.getElementById('surprise-title').innerText = q.title;
+            document.getElementById('surprise-time').innerText = `[ ${q.time} ]`;
+            document.getElementById('surprise-modal').style.display = 'flex';
+        }
+
+        function closeSurprise() {
+            document.getElementById('surprise-modal').style.display = 'none';
+        }
+
+        document.getElementById('btn-surprise-float').addEventListener('click', openSurprise);
+        document.getElementById('btn-surprise-later').addEventListener('click', closeSurprise);
+        document.getElementById('btn-surprise-done').addEventListener('click', () => {
+            if (playerState.surpriseStatus !== 'pending') { closeSurprise(); return; }
+            playerState.surpriseStatus = 'done';
+            playerState.diamonds += SURPRISE_REWARD;
+            saveState();
+            document.getElementById('global-diamond-total').innerText = playerState.diamonds;
+            closeSurprise();
+            updateSurpriseUI();
+            showToast(`SURPRISE QUEST CLEARED! +${SURPRISE_REWARD} 💎`, 'success');
+        });
+
+        // ================= PER-EXERCISE DIAMOND REWARD =================
+        function payExercise() {
+            playerState.diamonds += EXERCISE_REWARD;
+            document.getElementById('global-diamond-total').innerText = playerState.diamonds;
+            showToast(`+${EXERCISE_REWARD} 💎`, 'success');
+        }
+
+        // ================= EXTRA TRAINING (separate level) =================
+        const EXTRA_MAX = 30;
+        const extraPool = [
+            { name: "বার্পি (Burpees)", base: 10, step: 1, unit: "Reps" },
+            { name: "প্ল্যাঙ্ক (Plank)", base: 30, step: 5, unit: "Sec" },
+            { name: "মাউন্টেন ক্লাইম্বার (Mountain Climbers)", base: 30, step: 3, unit: "Reps" },
+            { name: "জাম্পিং জ্যাক (Jumping Jacks)", base: 30, step: 4, unit: "Reps" },
+            { name: "লাঞ্জেস (Lunges)", base: 16, step: 2, unit: "Reps" },
+            { name: "পাইক পুশ-আপ (Pike Push-ups)", base: 8, step: 1, unit: "Reps" },
+            { name: "ডায়মন্ড পুশ-আপ (Diamond Push-ups)", base: 10, step: 1, unit: "Reps" },
+            { name: "লেগ রেইজ (Leg Raises)", base: 12, step: 2, unit: "Reps" },
+            { name: "ওয়াল সিট (Wall Sit)", base: 40, step: 5, unit: "Sec" },
+            { name: "বাইসাইকেল ক্রাঞ্চ (Bicycle Crunches)", base: 24, step: 3, unit: "Reps" }
+        ];
+
+        function getExtraTasks(level) {
+            const count = Math.min(5 + Math.floor((level - 1) / 6), extraPool.length);
+            const tasks = [];
+            for (let i = 0; i < count; i++) {
+                const e = extraPool[((level - 1) * 3 + i) % extraPool.length];
+                const val = e.base + (level - 1) * e.step;
+                tasks.push({ title: e.name, time: `${val} ${e.unit}` });
+            }
+            return tasks;
+        }
+
+        function renderExtra() {
+            const lvl = Math.min(Math.max(playerState.extraLevel || 1, 1), EXTRA_MAX);
+            const done = playerState.extraDone || [];
+            const tasks = getExtraTasks(lvl);
+            document.getElementById('extra-lbl-curr').innerText = `EXTRA LVL ${lvl}`;
+            document.getElementById('extra-lbl-next').innerText = lvl >= EXTRA_MAX ? 'MAX' : `LVL ${lvl + 1}`;
+
+            const container = document.getElementById('extra-task-container');
+            container.innerHTML = '';
+            tasks.forEach((task, idx) => {
+                const isDone = done.includes(idx);
+                const label = document.createElement('label');
+                label.className = `quest-item w-full ${isDone ? 'completed' : ''}`;
+                label.innerHTML = `
+                    <input type="checkbox" class="custom-cb" ${isDone ? 'checked' : ''}>
+                    <div class="flex-1">
+                        <div class="q-title font-bold text-lg tracking-wide uppercase text-[#d4f0ff]">${task.title}</div>
+                        <div class="q-time sys-font text-sm text-[#00d2ff99] mt-1 tracking-widest">[ ${task.time} ]</div>
+                    </div>
+                `;
+                label.querySelector('input').addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        if (!playerState.extraDone.includes(idx)) playerState.extraDone.push(idx);
+                        if (!playerState.paidExtra.includes(idx)) { playerState.paidExtra.push(idx); payExercise(); }
+                        label.classList.add('completed');
+                    } else {
+                        playerState.extraDone = playerState.extraDone.filter(i => i !== idx);
+                        label.classList.remove('completed');
+                    }
+                    saveState();
+                    updateExtraProgress(tasks.length);
+                });
+                container.appendChild(label);
+            });
+            updateExtraProgress(tasks.length);
+        }
+
+        function updateExtraProgress(total) {
+            const count = (playerState.extraDone || []).length;
+            const pct = total ? (count / total) * 100 : 0;
+            document.getElementById('extra-progress-bar').style.width = `${pct}%`;
+            document.getElementById('extra-lbl-progress').textContent = `${Math.round(pct)}%`;
+            const btn = document.getElementById('btn-extra-levelup');
+            if (count >= total && total > 0) {
+                btn.disabled = false;
+                btn.classList.add('ready');
+                btn.innerText = playerState.extraLevel >= EXTRA_MAX ? '[ COMPLETE ]' : '[ EXTRA LEVEL UP ]';
+            } else {
+                btn.disabled = true;
+                btn.classList.remove('ready');
+                btn.innerText = 'Extra Level Up';
+            }
+        }
+
+        document.getElementById('btn-open-extra').addEventListener('click', () => {
+            renderExtra();
+            switchView(document.getElementById('win-quest'), document.getElementById('win-extra'));
+            document.getElementById('btn-open-store').classList.add('view-hidden');
+        });
+
+        document.getElementById('btn-extra-back').addEventListener('click', () => {
+            switchView(document.getElementById('win-extra'), document.getElementById('win-quest'));
+            document.getElementById('btn-open-store').classList.remove('view-hidden');
+        });
+
+        document.getElementById('btn-extra-levelup').addEventListener('click', () => {
+            if (document.getElementById('btn-extra-levelup').disabled) return;
+            if (playerState.extraLevel < EXTRA_MAX) {
+                playerState.extraLevel++;
+                showToast(`EXTRA LEVEL UP! ➜ LVL ${playerState.extraLevel} 💪`, 'success');
+            } else {
+                showToast('EXTRA MAX LEVEL CLEARED! 👑', 'success');
+            }
+            playerState.extraDone = [];
+            playerState.paidExtra = [];
+            saveState();
+            renderExtra();
+        });
+
         // ================= SAVE / LOAD =================
         function loadState() {
             try {
@@ -460,12 +701,15 @@
                 }
             } catch (e) { console.warn('Load failed', e); }
 
+            if (!playerState.surpriseThreshold) rollSurprise();
+
             // New Day Logic (1:00 AM Reset Boundary)
             const today = getSystemDay(new Date());
             if (playerState.lastDate !== today) {
                 playerState.completedTasks = [];
                 playerState.questCompletedForToday = false;
                 playerState.lastDate = today;
+                rollSurprise();
                 saveState();
             }
             updateUIFromState();
@@ -533,6 +777,7 @@
             playerState.completedTasks = [];
             playerState.questCompletedForToday = false;
             playerState.lastDate = getSystemDay(new Date());
+            rollSurprise();
             saveState();
             location.reload();
         });
@@ -550,6 +795,7 @@
                         playerState.completedTasks = [];
                         playerState.questCompletedForToday = false;
                         playerState.lastDate = systemDay;
+                        rollSurprise();
                         saveState();
                         renderTasks(); 
                     }
@@ -628,6 +874,7 @@
                     initAudio(); 
                     if (cb.checked) {
                         if (!playerState.completedTasks.includes(idx)) playerState.completedTasks.push(idx);
+                        if (!playerState.paidTasks.includes(idx)) { playerState.paidTasks.push(idx); payExercise(); }
                         label.classList.add('completed');
                         
                         const randomMsg = funnyMessages[Math.floor(Math.random() * funnyMessages.length)];
@@ -642,6 +889,7 @@
                     }
                     updateProgress();
                     saveState();
+                    checkSurprise();
                 });
                 container.appendChild(label);
             });
@@ -692,6 +940,7 @@
                 if(sword.rank === 'B') rankColor = "#c084fc";
                 if(sword.rank === 'A') rankColor = "#f87171";
                 if(sword.rank === 'S') rankColor = "#facc15";
+                if(sword.rank === 'SS') rankColor = "#ff2a2a";
 
                 card.innerHTML = `
                     <div class="sword-icon">${sword.icon}</div>
