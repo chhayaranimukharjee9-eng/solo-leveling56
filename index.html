@@ -227,6 +227,10 @@
         .rank-SS { border-color: #ff2a2a; box-shadow: inset 0 0 18px rgba(255,42,42,0.35), 0 0 10px rgba(255,42,42,0.25); }
         .surprise-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.78); z-index: 700; display: none; align-items: center; justify-content: center; padding: 16px; }
         .surprise-box { background: rgba(20, 0, 5, 0.95); border: 2px solid var(--neon-red); box-shadow: 0 0 40px var(--neon-red-glow), inset 0 0 25px rgba(255,42,42,0.25); width: 100%; max-width: 420px; padding: 24px; text-align: center; animation: pop-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+        .surprise-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,42,42,0.3); }
+        .surprise-row .sr-info { flex: 1; min-width: 0; text-align: left; }
+        .surprise-row .sr-title { font-weight: 700; font-size: 1.1rem; letter-spacing: 0.5px; text-transform: uppercase; }
+        .surprise-row .sr-time { font-size: 0.8rem; color: #94a3b8; margin-top: 2px; }
         .surprise-float { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 250; display: none; padding: 8px 18px; background: rgba(20,0,5,0.9); border: 1px solid var(--neon-red); color: var(--neon-red); text-shadow: 0 0 8px var(--neon-red-glow); font-family: 'Share Tech Mono', monospace; font-weight: bold; letter-spacing: 2px; cursor: pointer; animation: pulse-red 1s infinite; }
         @keyframes pulse-red { 0%, 100% { box-shadow: 0 0 8px rgba(255,42,42,0.4); } 50% { box-shadow: 0 0 22px var(--neon-red-glow); } }
 
@@ -635,14 +639,9 @@
     <div id="surprise-modal" class="surprise-overlay">
         <div class="surprise-box">
             <h1 class="sys-font text-2xl font-bold text-glow-red tracking-widest uppercase mb-2">[ ⚠ SURPRISE QUEST ]</h1>
-            <p class="sys-font text-sm text-gray-300 tracking-widest mb-4 uppercase">সিস্টেম একটা ইমার্জেন্সি কোয়েস্ট ডিটেক্ট করেছে!</p>
-            <div class="border-y border-[rgba(255,42,42,0.4)] py-4 my-3 bg-[rgba(255,42,42,0.06)]">
-                <div id="surprise-title" class="font-bold text-2xl tracking-wide uppercase text-[#d4f0ff]"></div>
-                <div id="surprise-time" class="sys-font text-lg text-glow-gold mt-1 tracking-widest"></div>
-            </div>
-            <p class="sys-font text-xl text-glow-pink font-bold mb-4">REWARD: +300 💎</p>
-            <button id="btn-surprise-done" class="btn-action ready mb-3" style="font-size:1.1rem; letter-spacing:2px;">COMPLETED ✔</button>
-            <button id="btn-surprise-later" class="btn-action back-btn" style="font-size:1rem;">LATER</button>
+            <p class="sys-font text-xs text-gray-300 tracking-widest mb-3 uppercase">এখন ব্যস্ত? কোনো সমস্যা নেই, পরে করিস। না করলেও জমা থাকবে, মুছবে না।</p>
+            <div id="surprise-list" style="max-height: 45vh; overflow-y: auto;"></div>
+            <button id="btn-surprise-later" class="btn-action back-btn mt-3" style="font-size:1rem;">LATER · পরে করবো</button>
         </div>
     </div>
     <button id="btn-surprise-float" class="surprise-float">⚠ SURPRISE QUEST</button>
@@ -669,6 +668,7 @@
             surpriseThreshold: 0,
             surpriseStatus: 'none',
             surpriseIdx: 0,
+            surpriseQueue: [],
             extraLevel: 1,
             extraDone: [],
             paidTasks: [],
@@ -792,6 +792,9 @@
             { title: "২৫টি ডায়মন্ড পুশ-আপ", time: "25 Reps" }
         ];
 
+        const SURPRISE_MAX_PENDING = 10;
+
+        // New day: re-arm tomorrow's surprise. Quests you have not done yet stay in the inbox (they never expire).
         function rollSurprise() {
             playerState.surpriseThreshold = 3 + Math.floor(Math.random() * 2); // 3 or 4 tasks
             playerState.paidTasks = []; // new day: exercise diamonds can be earned again
@@ -800,15 +803,33 @@
             updateSurpriseUI();
         }
 
+        function normalizeSurprise() {
+            if (!Array.isArray(playerState.surpriseQueue)) playerState.surpriseQueue = [];
+            // older saves: a quest that was "pending" becomes an inbox item
+            if (playerState.surpriseStatus === 'pending') {
+                playerState.surpriseQueue.push({ uid: 'q' + Date.now().toString(36), idx: playerState.surpriseIdx || 0, at: Date.now() });
+                playerState.surpriseStatus = 'spawned';
+                saveState();
+            }
+        }
+
         function updateSurpriseUI() {
+            normalizeSurprise();
             const btn = document.getElementById('btn-surprise-float');
-            if (btn) btn.style.display = (playerState.surpriseStatus === 'pending' && !penaltyTriggered) ? 'block' : 'none';
+            const n = playerState.surpriseQueue.length;
+            if (!btn) return;
+            btn.textContent = n > 1 ? `⚠ SURPRISE QUEST ×${n}` : '⚠ SURPRISE QUEST';
+            btn.style.display = (n > 0 && !penaltyTriggered) ? 'block' : 'none';
         }
 
         function checkSurprise() {
+            normalizeSurprise();
             if (playerState.surpriseStatus !== 'none') return;
             if (playerState.completedTasks.length >= playerState.surpriseThreshold) {
-                playerState.surpriseStatus = 'pending';
+                playerState.surpriseStatus = 'spawned'; // one new surprise per day
+                if (playerState.surpriseQueue.length < SURPRISE_MAX_PENDING) {
+                    playerState.surpriseQueue.push({ uid: 'q' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), idx: playerState.surpriseIdx, at: Date.now() });
+                }
                 saveState();
                 updateSurpriseUI();
                 // pops up at a random moment, not exactly on the click
@@ -816,11 +837,37 @@
             }
         }
 
+        function surpriseAge(at) {
+            const days = Math.floor((Date.now() - (at || Date.now())) / 86400000);
+            return days <= 0 ? 'আজ এসেছে' : `${days} দিন আগে এসেছে`;
+        }
+
+        function renderSurpriseList() {
+            const box = document.getElementById('surprise-list');
+            box.innerHTML = '';
+            playerState.surpriseQueue.forEach(item => {
+                const q = surpriseQuests[item.idx] || surpriseQuests[0];
+                const row = document.createElement('div');
+                row.className = 'surprise-row';
+                const info = document.createElement('div');
+                info.className = 'sr-info';
+                const t = document.createElement('div'); t.className = 'sr-title text-[#d4f0ff]'; t.textContent = q.title;
+                const m = document.createElement('div'); m.className = 'sr-time sys-font'; m.textContent = `[ ${q.time} ] · ${surpriseAge(item.at)}`;
+                info.appendChild(t); info.appendChild(m);
+                const btn = document.createElement('button');
+                btn.className = 'btn-action ready';
+                btn.style.cssText = 'width:auto; font-size:0.85rem; padding:8px 10px; letter-spacing:1px; flex-shrink:0;';
+                btn.textContent = `DONE ✔ +${SURPRISE_REWARD}💎`;
+                btn.addEventListener('click', () => completeSurprise(item.uid));
+                row.appendChild(info); row.appendChild(btn);
+                box.appendChild(row);
+            });
+        }
+
         function openSurprise() {
-            if (playerState.surpriseStatus !== 'pending' || penaltyTriggered) return;
-            const q = surpriseQuests[playerState.surpriseIdx] || surpriseQuests[0];
-            document.getElementById('surprise-title').innerText = q.title;
-            document.getElementById('surprise-time').innerText = `[ ${q.time} ]`;
+            normalizeSurprise();
+            if (!playerState.surpriseQueue.length || penaltyTriggered) return;
+            renderSurpriseList();
             document.getElementById('surprise-modal').style.display = 'flex';
         }
 
@@ -828,18 +875,22 @@
             document.getElementById('surprise-modal').style.display = 'none';
         }
 
-        document.getElementById('btn-surprise-float').addEventListener('click', openSurprise);
-        document.getElementById('btn-surprise-later').addEventListener('click', closeSurprise);
-        document.getElementById('btn-surprise-done').addEventListener('click', () => {
-            if (playerState.surpriseStatus !== 'pending') { closeSurprise(); return; }
-            playerState.surpriseStatus = 'done';
+        function completeSurprise(uid) {
+            const i = playerState.surpriseQueue.findIndex(x => x.uid === uid);
+            if (i < 0) return;
+            playerState.surpriseQueue.splice(i, 1);
             playerState.diamonds += SURPRISE_REWARD;
             saveState();
             document.getElementById('global-diamond-total').innerText = playerState.diamonds;
-            closeSurprise();
-            updateSurpriseUI();
             showToast(`SURPRISE QUEST CLEARED! +${SURPRISE_REWARD} 💎`, 'success');
-        });
+            updateSurpriseUI();
+            if (playerState.surpriseQueue.length) renderSurpriseList(); else closeSurprise();
+        }
+
+        document.getElementById('btn-surprise-float').addEventListener('click', openSurprise);
+        document.getElementById('btn-surprise-later').addEventListener('click', closeSurprise);
+        // after the saved game has loaded, show the inbox button if anything is waiting
+        setTimeout(updateSurpriseUI, 0);
 
         // ================= PER-EXERCISE DIAMOND REWARD =================
         function payExercise() {
