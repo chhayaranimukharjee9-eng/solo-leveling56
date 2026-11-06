@@ -130,6 +130,11 @@
         .quest-item.completed .q-time { color: #475569; }
         
         /* Message Box */
+        .system-msg-box { max-height: 30vh; overflow-y: auto; }
+        .sys-talk { align-items: center; gap: 6px; margin: 6px 0; }
+        .sys-input { flex: 1; min-width: 0; background: rgba(255,204,0,0.06); border: 1px dashed var(--neon-gold); color: var(--neon-gold); padding: 8px; border-radius: 4px; font-size: 0.95rem; outline: none; text-shadow: 0 0 5px var(--neon-gold-glow); }
+        .sys-mic { background: rgba(255,204,0,0.1); border: 1px dashed var(--neon-gold); color: var(--neon-gold); border-radius: 4px; padding: 8px 10px; font-size: 1rem; cursor: pointer; }
+        .sys-mic.listening { background: rgba(255,60,60,0.3); border-color: #ff4040; }
         .system-msg-box {
             background: rgba(255, 204, 0, 0.1); border: 1px dashed var(--neon-gold); padding: 8px; border-radius: 4px; min-height: 48px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 0.95rem; color: var(--neon-gold); text-shadow: 0 0 5px var(--neon-gold-glow); transition: all 0.3s ease; line-height: 1.2;
         }
@@ -478,6 +483,12 @@
             [ SYSTEM ] গ্রাইন্ডিং শুরু করো, আর্কিটেক্ট! রাত ১২টার আগে শেষ চাই! ⚡
         </div>
 
+        <div id="sys-talk" class="sys-talk" style="display:none">
+            <button id="sys-mic" class="sys-mic" type="button" aria-label="mic">🎤</button>
+            <input id="sys-input" class="sys-input sys-font" type="text" autocomplete="off" placeholder="...">
+            <button id="sys-send" class="sys-mic" type="button" aria-label="send">➤</button>
+        </div>
+
         <div class="scroll-list" id="task-container">
             <!-- Tasks injected via JS -->
         </div>
@@ -669,6 +680,8 @@
             surpriseStatus: 'none',
             surpriseIdx: 0,
             surpriseQueue: [],
+            autoSongAt: 0,
+            autoSongDone: true,
             extraLevel: 1,
             extraDone: [],
             paidTasks: [],
@@ -800,6 +813,8 @@
             playerState.paidTasks = []; // new day: exercise diamonds can be earned again
             playerState.surpriseStatus = 'none';
             playerState.surpriseIdx = Math.floor(Math.random() * surpriseQuests.length);
+            playerState.autoSongAt = Math.random() < 0.6 ? 1 + Math.floor(Math.random() * 2) : 0; // sometimes a song starts by itself after 1-2 exercises
+            playerState.autoSongDone = false;
             updateSurpriseUI();
         }
 
@@ -834,6 +849,14 @@
                 updateSurpriseUI();
                 // pops up at a random moment, not exactly on the click
                 setTimeout(openSurprise, 1000 + Math.random() * 6000);
+            }
+        }
+
+        function maybeAutoSong() {
+            if (!playerState.autoSongAt || playerState.autoSongDone) return;
+            if (playerState.completedTasks.length >= playerState.autoSongAt) {
+                playerState.autoSongDone = true; saveState();
+                if (window.__musicAutoPlay) window.__musicAutoPlay();
             }
         }
 
@@ -1403,9 +1426,9 @@
                         if (!playerState.paidTasks.includes(idx)) { playerState.paidTasks.push(idx); payExercise(); }
                         label.classList.add('completed');
                         
-                        const randomMsg = funnyMessages[Math.floor(Math.random() * funnyMessages.length)];
+                        const randomMsg = window.__systemTaunt ? window.__systemTaunt(funnyMessages) : funnyMessages[Math.floor(Math.random() * funnyMessages.length)];
                         const sysBox = document.getElementById('sys-msg-box');
-                        sysBox.innerText = randomMsg;
+                        sysBox.textContent = randomMsg;
                         sysBox.classList.remove('msg-animate');
                         void sysBox.offsetWidth;
                         sysBox.classList.add('msg-animate');
@@ -1416,6 +1439,7 @@
                     updateProgress();
                     saveState();
                     checkSurprise();
+                    if (cb.checked) maybeAutoSong();
                 });
                 container.appendChild(label);
             });
@@ -1712,6 +1736,7 @@
                 if (audio.paused) audio.play().catch(() => {}); else audio.pause();
             }
             window.__musicPause = () => { try { audio.pause(); } catch (e) {} };
+            window.__musicAutoPlay = () => { try { if (!songs.length || !audio.paused) return; const ids = songs.map(x => x.id); playSong(ids[Math.floor(Math.random() * ids.length)], ids.slice()); } catch (e) {} };
             window.__musicDebug = () => ({ cur: curId, paused: audio.paused, t: audio.currentTime, hasSrc: !!audio.src, queue: queue.slice(), songs: songs.length });
 
             function setMedia(s) {
@@ -1921,6 +1946,207 @@
 
             // ---------- boot: load saved library ----------
             dbAllMeta().then(m => { songs = m.sort((a, b) => a.addedAt - b.addedAt); render(); }).catch(() => { render(); });
+        })();
+
+        // ================= HIDDEN SYSTEM COMPANION =================
+        // Revealed/hidden by holding the MUSIC button for 10s. Talks only through the existing message box.
+        (function () {
+            const MEM_KEY = 'soloLevelingSystemMemory_v1';
+            const $ = id => document.getElementById(id);
+            const box = $('sys-msg-box'), row = $('sys-talk'), inp = $('sys-input'), micBtn = $('sys-mic'), sendBtn = $('sys-send');
+            const musicBtn = $('btn-open-music');
+            let mem = { notes: [], missed: [], pending: null, lastMissDay: null, name: '', key: '', provider: 'anthropic', model: '', voice: false, turns: 0 };
+            try { const r = JSON.parse(localStorage.getItem(MEM_KEY)); if (r && typeof r === 'object') mem = { ...mem, ...r }; } catch (e) {}
+            const save = () => { try { localStorage.setItem(MEM_KEY, JSON.stringify(mem)); } catch (e) {} };
+            const today = () => { try { return getSystemDay(new Date()); } catch (e) { return new Date().toDateString(); } };
+            const pick = a => a[Math.floor(Math.random() * a.length)];
+            const total = () => (typeof EXERCISES !== 'undefined' && EXERCISES.length) ? EXERCISES.length : document.querySelectorAll('#task-container .task-checkbox').length;
+            const doneN = () => playerState.completedTasks.length;
+
+            function show(text) {
+                box.textContent = '[ SYSTEM ] ' + text;
+                box.classList.remove('msg-animate'); void box.offsetWidth; box.classList.add('msg-animate');
+                box.scrollTop = 0;
+                if (mem.voice) speak(text);
+            }
+            function speak(t) {
+                try {
+                    if (!window.speechSynthesis) return;
+                    speechSynthesis.cancel();
+                    const u = new SpeechSynthesisUtterance(t); u.lang = 'bn-IN'; speechSynthesis.speak(u);
+                } catch (e) {}
+            }
+
+            const CATS = [
+                ['injury', /ব্যথা|চোট|আঘাত|মচকা|পা.{0,3}ব্যথা|কোমর|ঘাড়|বাথা|batha|byatha|chot|injur|hurt|pain|sprain/i, 'শরীরের ব্যথা'],
+                ['sick', /অসুস্থ|জ্বর|জ্বর|সর্দি|কাশি|পেট.{0,6}(খারাপ|ব্যথা)|শরীর খারাপ|jor\b|jwor|osustho|sick|fever|cold|cough|ill\b/i, 'অসুস্থতা'],
+                ['tired', /ক্লান্ত|টায়ার্ড|ঘুম|দুর্বল|klanto|ghum|tired|sleep|exhaust|weak/i, 'ক্লান্তি/ঘুম'],
+                ['busy', /ব্যস্ত|পড়া|পরীক্ষা|কাজ|স্কুল|কলেজ|অফিস|ক্লাস|tuition|bysto|byasto|poraso|porikkha|exam|study|work|office|school|college|class|busy/i, 'ব্যস্ততা/পড়াশোনা'],
+                ['family', /বাড়ি|মা\b|বাবা|অতিথি|আত্মীয়|অনুষ্ঠান|বিয়ে|পুজো|বেড়াতে|bari|guest|atiyo|biye|puja|family|party|trip|travel/i, 'পরিবার/অনুষ্ঠান'],
+                ['weather', /বৃষ্টি|গরম|ঠান্ডা|শীত|brishti|bristi|gorom|thanda|rain|hot\b|weather/i, 'আবহাওয়া'],
+                ['phone', /ফোন|মোবাইল|রিল|গেম|ইউটিউব|phone|mobile|reel|game|youtube|insta/i, 'ফোন/গেমে সময় চলে যাওয়া'],
+                ['mood', /মন খারাপ|ইচ্ছে করছিল না|ইচ্ছা করে না|ভালো লাগছিল না|কিছু ভালো লাগে না|lazy|alosh|আলসে|কুঁড়ে|mon kharap|mood|bhalo lagche na|iccha korchilo na|ichha kore na|bored|demotiv/i, 'মনের অবস্থা/আলসেমি']
+            ];
+            const CRISIS = /মরে যেতে|মরতে ইচ্ছে|মরে যাই|আত্মহত্যা|বাঁচতে ইচ্ছে করে না|নিজেকে শেষ|নিজের ক্ষতি|suicide|kill myself|want to die|end my life|self.?harm|morte chai|more jete chai|more jabo/i;
+            const MISS_RE = /করতে পারিনি|করতে পারি নি|করিনি|করি নি|করা হয়নি|করা হয়নি|হয়নি|হয়নি|করব না|korte parini|korte parlam na|kori ni|korini|kora hoyni|hoyni|miss|skipped|couldn'?t|didn'?t exercise|could not/i;
+            const STATUS_RE = /কতটা|কতগুলো|কতগুলি|আজ কী অবস্থা|স্ট্যাটাস|কত বাকি|koto ta|kototuku|koyta|status|progress|how many/i;
+            const NEXT_RE = /এরপর কী|এখন কী করব|কী করব|কোনটা করব|ki korbo|ekhon ki|what next|what should i/i;
+            const DONE_RE = /করে ফেলেছি|শেষ করেছি|করলাম|করেছি|kore felechi|korlam|korechi|finished|done\b/i;
+            const MOTIV_RE = /উৎসাহ|মোটিভ|হাল ছেড়ে|পারছি না|পারব না|motivat|give up|encourage|ar parchi na/i;
+            const THANKS_RE = /ধন্যবাদ|থ্যাঙ্ক|থ্যাংক|dhonnobad|thanks|thank you|tnx/i;
+            const WHO_RE = /তুই কে|তুমি কে|তোমার নাম|কে তুমি|tui ke|tumi ke|who are you|your name/i;
+            const GREET_RE = /^(হ্যালো|হাই|হেই|নমস্কার|hello|hi|hey|hlw|oi|ওই)\b/i;
+            const NAME_RE = /(?:আমার নাম|amar nam|my name is|i am|ami)\s+([^\s,।.!?]{2,20})/i;
+
+            function remember(note) {
+                if (!note) return;
+                mem.notes.push({ d: today(), t: note });
+                if (mem.notes.length > 80) mem.notes.splice(0, mem.notes.length - 80);
+                save();
+            }
+            function topFact() {
+                const m = mem.missed.slice(-10); const c = {};
+                m.forEach(x => { if (x.cat) c[x.cat] = (c[x.cat] || 0) + 1; });
+                const e = Object.entries(c).sort((a, b) => b[1] - a[1])[0];
+                return e && e[1] >= 2 ? e : null;
+            }
+            const TIPS = {
+                injury: 'ব্যথা থাকলে জোর করিস না। ব্যথার জায়গাটা বাদ দিয়ে হালকা স্ট্রেচিং কর, আর ব্যথা বাড়লে ডাক্তার দেখা।',
+                sick: 'অসুস্থ শরীরে বিশ্রামই আসল ট্রেনিং। সুস্থ হলে ধীরে ফিরে আসিস, দরকারে ডাক্তার দেখা।',
+                tired: 'ক্লান্তি থাকলে আজ শুধু ১টা হালকা এক্সারসাইজ কর। রাতে তাড়াতাড়ি ঘুমানোটাও ট্রেনিং।',
+                busy: 'ব্যস্ত দিনে পুরোটা না পারলে মাত্র ২ মিনিটের ১টা এক্সারসাইজ কর। ধারাবাহিকতাই আসল।',
+                family: 'পরিবারের সময়টাও দামি। পরদিন সকালে ১০ মিনিট আগে উঠে পুষিয়ে নিস।',
+                weather: 'আবহাওয়া খারাপ হলে ঘরের ভেতরেই কর — পুশআপ, প্র্যাণায়াম, কপালভাতি তো ঘরেই হয়।',
+                phone: 'ফোন রেখে এখনই ১টা এক্সারসাইজ কর। শুরুটাই কঠিন, তারপর সহজ।',
+                mood: 'মন না চাইলেও শুধু ১ মিনিট শুরু কর। শুরু করলে বেশিরভাগ সময় মন নিজেই চলে আসে।'
+            };
+
+            function localReply(t) {
+                const left = Math.max(0, total() - doneN());
+                const nm = mem.name ? mem.name + ', ' : '';
+                if (CRISIS.test(t)) return { text: 'তুই যা বলছিস সেটা গুরুত্বপূর্ণ, আর তুই একা নোস। এক্ষুনি কোনো বিশ্বাসের মানুষের পাশে যা বা তাকে ফোন কর। ভারতে Tele-MANAS: 14416 (২৪ ঘণ্টা, বিনামূল্যে)। বিপদ মনে হলে ১১২ ডায়াল কর। আমি এখানেই আছি।', crisis: true };
+                const nameM = t.match(NAME_RE);
+                if (/আমার নাম|amar nam|my name is/i.test(t) && nameM) { mem.name = nameM[1]; save(); return { text: 'মনে রাখলাম — তোর নাম ' + mem.name + '। আজ থেকে তোকে এই নামেই ডাকব।' }; }
+                if (mem.pending === 'why') {
+                    mem.pending = null;
+                    let cat = null, label = 'অন্য কারণ';
+                    for (const [k, re, l] of CATS) if (re.test(t)) { cat = k; label = l; break; }
+                    mem.missed.push({ d: today(), cat, label, said: t.slice(0, 160) });
+                    if (mem.missed.length > 60) mem.missed.shift();
+                    remember('এক্সারসাইজ মিস — কারণ: ' + label + ' (' + t.slice(0, 80) + ')');
+                    save();
+                    let r = 'বুঝলাম — ' + label + '। কারণ জানানোর জন্য ধন্যবাদ। ' + (cat ? TIPS[cat] : 'সমস্যাটা আরেকটু খুলে বল, মনে রাখব।');
+                    const tf = topFact(); if (tf) r += ' (লক্ষ্য করেছি, সম্প্রতি "' + tf[0] + '" বারবার হচ্ছে — এটার একটা পাকা সমাধান বের করা দরকার।)';
+                    return { text: r };
+                }
+                if (WHO_RE.test(t)) return { text: 'আমি তোর সিস্টেম — তোর ট্রেনিংয়ের হিসাব রাখি, তোর কথা মনে রাখি, আর তোকে এগিয়ে নিয়ে যাই।' };
+                if (MISS_RE.test(t) && !DONE_RE.test(t.replace(MISS_RE, ''))) {
+                    mem.lastMissDay = today(); mem.pending = 'why'; save();
+                    return { text: pick(['কেন পারলি না? সত্যিটা বল, আমি শুনছি।', nm + 'আজ কেন করা হয়নি? কী সমস্যা হয়েছিল?', 'ঠিক আছে, দোষ দেব না। শুধু বল — কেন করতে পারলি না?']) };
+                }
+                if (STATUS_RE.test(t)) return { text: 'আজ ' + doneN() + '/' + total() + ' টা হয়েছে' + (left ? ', বাকি ' + left + 'টা। আর একটু!' : ' — সব শেষ! দারুণ!') + ' 💎 ' + playerState.diamonds };
+                if (NEXT_RE.test(t)) { const rem = Array.from(document.querySelectorAll('#task-container .quest-item:not(.completed)')); const n = rem[0] && rem[0].textContent.replace(/\s+/g, ' ').trim().slice(0, 40); return { text: left ? 'পরেরটা ধর' + (n ? ': ' + n : '') + '। শুধু শুরু কর।' : 'আজকের সব শেষ। বিশ্রাম নে, কাল আবার।' }; }
+                if (DONE_RE.test(t)) return { text: doneN() ? 'ভালো! ' + doneN() + 'টা হিসাবে আছে। চেকবক্সে টিক দিতে ভুলিস না, 💎 পাবি।' : 'দারুণ! তবে চেকবক্সে টিক না দিলে আমার হিসাবে ধরা পড়ে না।' };
+                if (MOTIV_RE.test(t)) return { text: pick(['শ্যাডো মনার্কও লেভেল ১ থেকে শুরু করেছিল। আজ শুধু একটা কর।', 'হাল ছাড়া সহজ, কিন্তু তুই সহজ পথের লোক না। একটা এক্সারসাইজ — এখনই।', 'প্রতিদিন একটু একটু — এভাবেই হান্টার শক্ত হয়।']) };
+                if (THANKS_RE.test(t)) return { text: 'আমি তো তোর পাশেই আছি। এবার কাজে ফেরা যাক!' };
+                if (GREET_RE.test(t)) return { text: 'বল, শুনছি। ' + (doneN() ? 'আজ ' + doneN() + 'টা হয়েছে।' : 'আজ এখনও শুরু হয়নি।') };
+                const catHit = CATS.find(c => c[1].test(t));
+                if (catHit) { remember('বলেছিল: ' + t.slice(0, 80)); return { text: 'শুনলাম — ' + catHit[2] + '। ' + TIPS[catHit[0]] }; }
+                remember('বলেছিল: ' + t.slice(0, 80));
+                return { text: pick(['শুনলাম, মনে রেখে দিলাম। আরও কিছু বলার থাকলে বল।', 'বুঝেছি। তোর ট্রেনিংয়ের জন্য আর কী করতে পারি?', 'ঠিক আছে। আজ ' + (left ? 'আর ' + left + 'টা এক্সারসাইজ বাকি।' : 'সব এক্সারসাইজ শেষ।')]) };
+            }
+
+            // ---- optional real AI (needs the user's own key; typed as /key ...) ----
+            async function llmReply(t) {
+                if (!mem.key) return null;
+                const ctx = 'তুমি Solo Leveling-স্টাইল ফিটনেস অ্যাপের "সিস্টেম"। ব্যবহারকারীকে ছোট, সহানুভূতিশীল বাংলায় (তুই করে) উত্তর দাও, সর্বোচ্চ ২-৩ বাক্য। আজ ' + doneN() + '/' + total() + ' এক্সারসাইজ শেষ, লেভেল ' + playerState.level + '। নাম: ' + (mem.name || 'অজানা') + '। মনে রাখা তথ্য: ' + mem.notes.slice(-15).map(n => n.d + ' ' + n.t).join(' | ') + '। চিকিৎসা-সংক্রান্ত বিষয়ে ডাক্তার দেখাতে বলো। আত্মক্ষতির কথা হলে সহমর্মিতার সাথে Tele-MANAS 14416 জানাও।';
+                try {
+                    if (mem.provider === 'gemini') {
+                        const model = mem.model || 'gemini-2.0-flash';
+                        const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': mem.key }, body: JSON.stringify({ systemInstruction: { parts: [{ text: ctx }] }, contents: [{ role: 'user', parts: [{ text: t }] }] }) });
+                        if (!r.ok) return null; const j = await r.json();
+                        return j.candidates && j.candidates[0] && j.candidates[0].content.parts[0].text;
+                    }
+                    const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': mem.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }, body: JSON.stringify({ model: mem.model || 'claude-haiku-4-5', max_tokens: 300, system: ctx, messages: [{ role: 'user', content: t }] }) });
+                    if (!r.ok) return null; const j = await r.json();
+                    return j.content && j.content[0] && j.content[0].text;
+                } catch (e) { return null; }
+            }
+
+            function command(t) {
+                const m = t.match(/^\/(\w+)\s*(.*)$/); if (!m) return false;
+                const c = m[1].toLowerCase(), a = m[2].trim();
+                if (c === 'key') { mem.key = a; save(); show(a ? 'কী সেভ হয়েছে। এখন থেকে আসল AI দিয়ে উত্তর দেব (ব্যর্থ হলে নিজের মতো উত্তর দেব)।' : 'কী মুছে ফেলা হয়েছে।'); return true; }
+                if (c === 'ai') { mem.provider = /gem/i.test(a) ? 'gemini' : 'anthropic'; save(); show('প্রোভাইডার: ' + mem.provider); return true; }
+                if (c === 'model') { mem.model = a; save(); show('মডেল: ' + (a || 'ডিফল্ট')); return true; }
+                if (c === 'voice') { mem.voice = !mem.voice; save(); show(mem.voice ? 'এখন থেকে আমি জোরে বলব।' : 'ভয়েস বন্ধ।'); return true; }
+                if (c === 'forget') { mem = { notes: [], missed: [], pending: null, lastMissDay: null, name: '', key: '', provider: 'anthropic', model: '', voice: false, turns: 0 }; save(); show('সব স্মৃতি মুছে ফেললাম।'); return true; }
+                if (c === 'me') { show(mem.notes.length ? 'যা মনে আছে: ' + mem.notes.slice(-6).map(n => n.t).join(' • ') : 'এখনও কিছু মনে নেই।'); return true; }
+                return false;
+            }
+
+            async function onUser(text) {
+                text = (text || '').trim(); if (!text) return;
+                inp.value = '';
+                if (command(text)) return;
+                mem.turns++; save();
+                const loc = localReply(text);
+                if (loc.crisis) { show(loc.text); return; }
+                let out = null;
+                if (mem.key) { box.textContent = '[ SYSTEM ] …'; out = await llmReply(text); if (out) { remember('বলেছিল: ' + text.slice(0, 80)); if (/মিস|করতে পারিনি|korte parini|করিনি/i.test(text)) { mem.pending = null; } } }
+                show(out || loc.text);
+            }
+
+            // ---- mic (tap to talk) ----
+            let rec = null, listening = false;
+            function toggleMic() {
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SR) { show('এই ব্রাউজারে মাইক চলে না — কিবোর্ডে লিখে বল।'); inp.focus(); return; }
+                if (listening && rec) { try { rec.stop(); } catch (e) {} return; }
+                rec = new SR(); rec.lang = 'bn-IN'; rec.interimResults = false; rec.maxAlternatives = 1;
+                rec.onstart = () => { listening = true; micBtn.classList.add('listening'); };
+                rec.onend = () => { listening = false; micBtn.classList.remove('listening'); };
+                rec.onerror = e => { listening = false; micBtn.classList.remove('listening'); if (e && e.error === 'not-allowed') show('মাইকের অনুমতি দে (ব্রাউজার সেটিংসে)।'); };
+                rec.onresult = e => { const t = e.results[0] && e.results[0][0] && e.results[0][0].transcript; if (t) { inp.value = t; onUser(t); } };
+                try { rec.start(); } catch (e) {}
+            }
+            micBtn.addEventListener('click', toggleMic);
+            sendBtn.addEventListener('click', () => onUser(inp.value));
+            inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); onUser(inp.value); } });
+
+            // ---- hold MUSIC for 10s: show / hide the talk row ----
+            const setRow = on => { row.style.display = on ? 'flex' : 'none'; try { localStorage.setItem('soloLevelingSysRow', on ? '1' : '0'); } catch (e) {} if (!on) { try { speechSynthesis.cancel(); } catch (e) {} } };
+            try { if (localStorage.getItem('soloLevelingSysRow') === '1') row.style.display = 'flex'; } catch (e) {}
+            let holdT = null, swallow = false;
+            const startHold = () => { clearTimeout(holdT); holdT = setTimeout(() => { swallow = true; setRow(row.style.display !== 'flex'); if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) {} if (row.style.display === 'flex') { if (mem.lastMissDay && mem.lastMissDay !== today() && doneN() === 0) mem.pending = null; show(mem.name ? mem.name + ', বল, শুনছি।' : 'বল, শুনছি।'); } }, 10000); };
+            const endHold = () => clearTimeout(holdT);
+            musicBtn.addEventListener('pointerdown', startHold);
+            ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => musicBtn.addEventListener(ev, endHold));
+            musicBtn.addEventListener('contextmenu', e => { e.preventDefault(); });
+            musicBtn.addEventListener('click', e => { if (swallow) { swallow = false; e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+
+            // ---- personalised system messages in place of the random funny one ----
+            window.__systemTaunt = function (list) {
+                const nm = mem.name ? mem.name + ', ' : '';
+                const left = Math.max(0, total() - doneN());
+                const r = Math.random();
+                if (r < 0.35 && mem.notes.length) {
+                    const last = mem.missed[mem.missed.length - 1];
+                    if (last && last.cat && TIPS[last.cat] && Math.random() < 0.5) return nm + 'আগে "' + last.label + '" সমস্যা বলেছিলি — আজ কেমন চলছে? ' + (left ? 'আর ' + left + 'টা বাকি।' : 'সব শেষ!');
+                }
+                if (r < 0.6) return nm + (left ? 'আর ' + left + 'টা বাকি। থামিস না!' : 'আজকের সব শেষ! দারুণ কাজ!');
+                return pick(list);
+            };
+            // when a day was missed, the next time the app opens the system asks why (only visible in the message box)
+            window.__systemGreet = function () {
+                try {
+                    const last = mem.lastActive; mem.lastActive = today();
+                    if (last && last !== today() && !mem.askedFor) {
+                        // previous day had no exercise at all? we only know via saved flag below
+                    }
+                    save();
+                } catch (e) {}
+            };
         })();
 
         // ================= SECRET RESET: hold the STORE button for 10 seconds =================
