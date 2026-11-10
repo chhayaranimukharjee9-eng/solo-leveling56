@@ -681,6 +681,7 @@
             surpriseIdx: 0,
             surpriseQueue: [],
             autoSongAt: 0,
+            timerOffFor: null,
             autoSongDone: true,
             extraLevel: 1,
             extraDone: [],
@@ -1338,7 +1339,7 @@
                 const systemDay = getSystemDay(now);
                 
                 if (playerState.lastDate !== systemDay) {
-                    if (!playerState.questCompletedForToday && playerState.completedTasks.length < currentTaskCount && !penaltyTriggered) {
+                    if (!playerState.questCompletedForToday && playerState.completedTasks.length < currentTaskCount && !penaltyTriggered && playerState.timerOffFor !== playerState.lastDate) {
                         triggerPenalty();
                     } else {
                         playerState.completedTasks = [];
@@ -1362,6 +1363,11 @@
                     timerEl.classList.add('text-glow-red', 'animate-pulse');
                 }
 
+                if (playerState.timerOffFor && playerState.timerOffFor === playerState.lastDate) {
+                    timerEl.innerText = 'TIMER OFF';
+                    timerEl.classList.remove('animate-pulse');
+                    return;
+                }
                 let deadline = new Date(now);
                 if (now.getHours() >= 1) {
                     deadline.setDate(deadline.getDate() + 1);
@@ -1736,6 +1742,12 @@
                 if (audio.paused) audio.play().catch(() => {}); else audio.pause();
             }
             window.__musicPause = () => { try { audio.pause(); } catch (e) {} };
+            window.__musicCtl = {
+                list: () => songs.map(x => ({ id: x.id, name: x.name || '' })),
+                play: id => { try { playSong(id, songs.map(x => x.id)); } catch (e) {} },
+                pause: () => { try { audio.pause(); } catch (e) {} },
+                any: () => { try { if (audio.src && audio.paused) { audio.play().catch(() => {}); return; } const ids = songs.map(x => x.id); if (ids.length) playSong(ids[Math.floor(Math.random() * ids.length)], ids.slice()); } catch (e) {} }
+            };
             window.__musicAutoPlay = () => { try { if (!songs.length || !audio.paused) return; const ids = songs.map(x => x.id); playSong(ids[Math.floor(Math.random() * ids.length)], ids.slice()); } catch (e) {} };
             window.__musicDebug = () => ({ cur: curId, paused: audio.paused, t: audio.currentTime, hasSrc: !!audio.src, queue: queue.slice(), songs: songs.length });
 
@@ -2085,10 +2097,114 @@
                 return false;
             }
 
+            // ================= APP CONTROL (music / timer / tick / buy) =================
+            const BN = { 'ক':'k','খ':'k','গ':'g','ঘ':'g','ঙ':'n','চ':'k','ছ':'k','জ':'j','ঝ':'j','ঞ':'n','ট':'t','ঠ':'t','ড':'d','ঢ':'d','ণ':'n','ত':'t','থ':'t','দ':'d','ধ':'d','ন':'n','প':'p','ফ':'p','ব':'b','ভ':'b','ম':'m','য':'j','র':'r','ল':'l','শ':'s','ষ':'s','স':'s','ড়':'r','ঢ়':'r','য়':'','হ':'','ং':'n','ঁ':'','ঃ':'' };
+            function skel(str) {
+                let o = '';
+                for (const ch of String(str || '').normalize('NFC').replace(/\u09AF\u09BC/g, '').replace(/[\u09A1\u09A2]\u09BC/g, 'র')) o += (ch in BN) ? BN[ch] : (/[a-z]/i.test(ch) ? ch.toLowerCase() : (/\s/.test(ch) ? ' ' : ''));
+                return o.replace(/\bkn/g, 'n').replace(/sw(?=o)/g, 's').replace(/gh/g, '').replace(/ph/g, 'p').replace(/[aeiouyh]/g, '').replace(/c|q|x/g, 'k').replace(/z/g, 'j').replace(/[wv]/g, 'b').replace(/f/g, 'p').replace(/ /g, '').replace(/(.)\1+/g, '$1');
+            }
+            function words(name) {
+                return String(name).replace(/[()'’\-:+&]/g, ' ').split(/\s+/).filter(w => w && !/^(of|the|s|a|and)$/i.test(w)).map(w => (w.length >= 3 && /s$/i.test(w) && !/ss$/i.test(w)) ? w.slice(0, -1) : w);
+            }
+            // best match of a spoken/typed phrase against a list of {id,name}; returns item or null
+            function findBest(text, items, nameOf) {
+                const q = skel(text); if (q.length < 3) return null;
+                const low = String(text).toLowerCase().replace(/[^a-z\s]/g, ' ');
+                let best = null, bs = 0, second = 0;
+                items.forEach(it => {
+                    const nm = nameOf(it); const ws = words(nm).map(skel).filter(w => w.length >= 2);
+                    if (!ws.length) return;
+                    const total = words(nm).map(skel).join('').length;
+                    let hit = 0, nHit = 0;
+                    const lw = words(nm).map(x => x.toLowerCase().replace(/[^a-z]/g, '').replace(/s$/, '')).filter(x => x.length >= 3);
+                    ws.forEach((w, i) => { if (w.length >= 3 && q.includes(w)) { hit += w.length; nHit++; } });
+                    lw.forEach(x => { if (low.includes(x) && !ws.some(w => w.length >= 3 && q.includes(w) && skel(x) === w)) { hit += 3; nHit++; } });
+                    if (nm.toLowerCase().replace(/[^a-z]/g, '').length >= 4 && low.replace(/\s/g, '').includes(nm.toLowerCase().replace(/[^a-z]/g, ''))) hit = Math.max(total, 5);
+                    const full = words(nm).map(skel).filter(Boolean).join('');
+                    if (full.length >= 3 && q.includes(full)) hit = Math.max(hit, total, 3);
+                    if (!hit) return;
+                    const cover2 = hit / total;
+                    if (cover2 < 0.6 || hit < 3) return;
+                    const sc = hit + Math.min(1, cover2) * 3;
+                    if (sc > bs) { second = bs; bs = sc; best = it; } else if (sc > second) second = sc;
+                });
+                return best;
+            }
+            const T_TIMER = /টাইমার|টাইম|ঘড়ি|ডেডলাইন|timer|deadline|countdown|কাউন্টডাউন/i;
+            const T_OFF = /অফ|বন্ধ|বন্দ|থামা|থামাও|সরা|off|stop|disable|pause|band/i;
+            const T_ON = /অন\b|চালু|শুরু|on\b|enable|start|chalu/i;
+            const T_MUSIC = /গান|গানটা|song|music|মিউজিক|gaan|gan\b|playlist|প্লেলিস্ট/i;
+            const T_PLAY = /চালু|চালা|বাজা|শোনা|শুনব|শুনবো|প্লে|play|chalu|chalao|baja|start|লাগা/i;
+            const T_STOP = /বন্ধ|থামা|থামাও|অফ|stop|pause|off|band|থাম/i;
+            const T_BUY = /কিন|কেন\b|কিনে|কিনব|কিনবো|বাই|buy|purchase|unlock|আনলক|নিয়ে দে|নিয়ে নে|kin\b|kine|kino/i;
+            const T_TICK = /হয়ে গেছে|হয়ে গেল|হয়ে গিয়েছে|করে ফেলেছি|করেছি|করলাম|শেষ|টিক|সম্পূর্ণ|done|finish|tick|complete|hoye gese|hoye geche|hoye gelo|korlam|korechi/i;
+            const T_NEG = /পারিনি|পারি নি|করিনি|করি নি|হয়নি|হয়নি|না করে|parini|korini|hoyni|didn'?t|couldn'?t|not done/i;
+            const allTasks = () => {
+                const out = [];
+                document.querySelectorAll('#task-container label.quest-item, #extra-task-container label.quest-item').forEach(l => {
+                    const t = l.querySelector('.q-title'); const cb = l.querySelector('input[type=checkbox]');
+                    if (t && cb) out.push({ name: t.textContent.trim(), cb, el: l });
+                });
+                return out;
+            };
+            function buyItem(it, kind) {
+                const owned = kind === 'skill' ? (playerState.ownedSkills || []) : (playerState.ownedSwords || []);
+                if (owned.includes(it.id)) return '[' + it.name + '] তোর আগেই কেনা আছে।';
+                if (playerState.diamonds < it.price) return 'ডায়মন্ড নেই! [' + it.name + '] এর দাম ' + it.price + ' 💎, তোর আছে ' + playerState.diamonds + ' 💎। আরও ' + (it.price - playerState.diamonds) + ' 💎 লাগবে।';
+                playerState.diamonds -= it.price;
+                if (kind === 'skill') { if (!Array.isArray(playerState.ownedSkills)) playerState.ownedSkills = []; playerState.ownedSkills.push(it.id); } else playerState.ownedSwords.push(it.id);
+                const gd = document.getElementById('global-diamond-total'); if (gd) gd.innerText = playerState.diamonds;
+                saveState();
+                try { renderStore(); } catch (e) {}
+                try { showToast('Purchased [' + it.name + ']!', 'success'); } catch (e) {}
+                return 'কিনে দিলাম: [' + it.name + '] — ' + it.price + ' 💎 কাটা গেল। এখন ' + playerState.diamonds + ' 💎 আছে।';
+            }
+            // returns a reply string if the text was an app command, else null
+            function actions(t) {
+                if (T_NEG.test(t)) return null;
+                // 1) buy
+                if (T_BUY.test(t)) {
+                    const sw = findBest(t, swordData, x => x.name), sk = findBest(t, skillData, x => x.name);
+                    const ws = sw ? skel(sw.name).length : 0, ks = sk ? skel(sk.name).length : 0;
+                    if (sw || sk) return (sk && ks > ws) ? buyItem(sk, 'skill') : buyItem(sw, 'weapon');
+                    return 'কোন জিনিসটা কিনব বুঝলাম না। স্টোরের নামটা (ইংরেজিতে) লিখে বল, যেমন: Knight\'s Sword কিনে দে।';
+                }
+                // 2) timer
+                if (T_TIMER.test(t) && !T_MUSIC.test(t)) {
+                    if (T_OFF.test(t)) { playerState.timerOffFor = playerState.lastDate; saveState(); return 'টাইমার বন্ধ করে দিলাম। আজ রাত ১টায় পেনাল্টি আসবে না। কাল থেকে আবার চালু হবে।'; }
+                    if (T_ON.test(t)) { playerState.timerOffFor = null; saveState(); return 'টাইমার আবার চালু করলাম।'; }
+                }
+                // 3) music
+                if (T_MUSIC.test(t) && (T_PLAY.test(t) || T_STOP.test(t))) {
+                    const ctl = window.__musicCtl;
+                    if (!ctl) return 'মিউজিক প্লেয়ার এখনও তৈরি হয়নি।';
+                    if (T_STOP.test(t) && !T_PLAY.test(t.replace(T_STOP, ''))) { ctl.pause(); return 'গান থামিয়ে দিলাম।'; }
+                    const list = ctl.list();
+                    if (!list.length) return 'অ্যাপে কোনো গান নেই। আগে MUSIC থেকে গান যোগ কর।';
+                    const hit = findBest(t, list, x => x.name.replace(/\.[a-z0-9]{2,4}$/i, '').replace(/[_\d]+/g, ' '));
+                    if (hit) { ctl.play(hit.id); return 'চালিয়ে দিলাম: ' + hit.name.replace(/\.[a-z0-9]{2,4}$/i, ''); }
+                    ctl.any(); return 'একটা গান চালিয়ে দিলাম। নির্দিষ্ট গান চাইলে নামটা বল।';
+                }
+                // 4) tick an exercise
+                if (T_TICK.test(t)) {
+                    const list = allTasks();
+                    const hit = findBest(t, list, x => x.name);
+                    if (hit) {
+                        if (hit.cb.disabled) return 'আজকের কোয়েস্ট আগেই শেষ হয়ে ফ্রিজ হয়ে আছে।';
+                        if (hit.cb.checked) return '[' + hit.name + '] আগেই টিক দেওয়া আছে।';
+                        hit.cb.click();
+                        return 'টিক দিয়ে দিলাম: ' + hit.name + '। ✅';
+                    }
+                }
+                return null;
+            }
+
             async function onUser(text) {
                 text = (text || '').trim(); if (!text) return;
                 inp.value = '';
                 if (command(text)) return;
+                if (!CRISIS.test(text)) { let a = null; try { a = actions(text); } catch (e) { a = null; } if (a) { remember('কমান্ড: ' + text.slice(0, 60)); show(a); return; } }
                 mem.turns++; save();
                 const loc = localReply(text);
                 if (loc.crisis) { show(loc.text); return; }
